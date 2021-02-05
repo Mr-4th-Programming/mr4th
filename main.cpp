@@ -10,6 +10,7 @@
 #define EvalPrintULL(x) printf("%s = %llu\n", #x, (U64)(x))
 #define EvalPrintF(x) printf("%s = %e [%f]\n", #x, (F64)(x), (F64)(x))
 #define EvalPrintB(x) printf("%s = %s\n", #x, (char*)((x)?"true":"false"))
+#define EvalPrintS(x) printf("%s = %s\n", #x, (char*)(x))
 
 struct TestStruct{
     int a;
@@ -108,6 +109,9 @@ int main(){
     EvalPrintB(intr_contains(i2f32(20, 20, 200, 200), v2f32(100, 199)));
     EvalPrintB(intr_contains(i2f32(20, 20, 200, 200), v2f32(100, 201)));
     EvalPrintB(intr_contains(i2f32(20, 20, 200, 200), v2f32(19, 199)));
+    
+    EvalPrintS(string_from_operating_system(operating_system_from_context()));
+    EvalPrintS(string_from_day_of_week(DayOfWeek_Wednesday));
     
     return(0);
 }

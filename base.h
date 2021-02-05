@@ -237,7 +237,54 @@ enum Axis{
     Axis_X,
     Axis_Y,
     Axis_Z,
-    Axis_W,
+    Axis_W
+};
+
+enum Side{
+    Side_Min,
+    Side_Max
+};
+
+enum OperatingSystem{
+    OperatingSystem_Null,
+    OperatingSystem_Windows,
+    OperatingSystem_Linux,
+    OperatingSystem_Mac,
+    OperatingSystem_COUNT
+};
+
+enum Architecture{
+    Architecture_Null,
+    Architecture_X64,
+    Architecture_X86,
+    Architecture_Arm,
+    Architecture_Arm64,
+    Architecture_COUNT
+};
+
+enum Month{
+    Month_Jan,
+    Month_Feb,
+    Month_Mar,
+    Month_Apr,
+    Month_May,
+    Month_Jun,
+    Month_Jul,
+    Month_Aug,
+    Month_Sep,
+    Month_Oct,
+    Month_Nov,
+    Month_Dec
+};
+
+enum DayOfWeek{
+    DayOfWeek_Sunday,
+    DayOfWeek_Monday,
+    DayOfWeek_Tuesday,
+    DayOfWeek_Wednesday,
+    DayOfWeek_Thursday,
+    DayOfWeek_Friday,
+    DayOfWeek_Saturday
 };
 
 ////////////////////////////////
@@ -335,6 +382,17 @@ union I2F32{
     V2F32 p[2];
     F32 v[4];
 };
+
+////////////////////////////////
+// NOTE(allen): Symbolic Constant Functions
+
+function OperatingSystem operating_system_from_context(void);
+function Architecture architecture_from_context(void);
+
+function char* string_from_operating_system(OperatingSystem os);
+function char* string_from_architecture(Architecture arch);
+function char* string_from_month(Month month);
+function char* string_from_day_of_week(DayOfWeek day_of_week);
 
 ////////////////////////////////
 // NOTE(allen): Float Constant Functions

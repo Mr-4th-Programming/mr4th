@@ -12,6 +12,13 @@
 #define EvalPrintB(x) printf("%s = %s\n", #x, (char*)((x)?"true":"false"))
 #define EvalPrintS(x) printf("%s = %s\n", #x, (char*)(x))
 
+struct Node{
+    Node *next;
+    Node *prev;
+    
+    int x;
+};
+
 struct TestStruct{
     int a;
     int b;
@@ -20,6 +27,29 @@ struct TestStruct{
 };
 
 int main(){
+    Node nodes[10];
+    for (int i = 0; i < ArrayCount(nodes); i += 1){
+        nodes[i].x = i;
+    }
+    
+    {
+        Node *first = 0;
+        Node *last = 0;
+        for (int i = 0; i < 10; i += 1){
+            SLLStackPush(first, &nodes[i]);
+        }
+        SLLStackPop(first);
+        SLLStackPop(first);
+        SLLStackPop(first);
+        for (Node *node = first;
+             node != 0;
+             node = node->next){
+            EvalPrint(node->x);
+        }
+    }
+    
+    
+    
     int foo[100];
     for (int i = 0; i < ArrayCount(foo); i += 1){
         foo[i] = i;

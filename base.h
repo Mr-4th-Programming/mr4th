@@ -178,6 +178,56 @@ Min(sizeof(*(d)),sizeof(*(s))))
 Min(sizeof(*(d)),sizeof(*(s)))*(c))
 
 ////////////////////////////////
+// NOTE(allen): Linked List Macros
+
+// TODO(allen): 
+//  Singly Linked List Queue
+//   PushBack
+//   PushFront
+//   Pop
+//  Singly Linked List Stack
+//   Push
+//   Pop
+
+#define DLLPushBack_NP(f,l,n,next,prev) ((f)==0?\
+((f)=(l)=(n),(n)->next=(n)->prev=0):\
+((n)->prev=(l),(l)->next=(n),(l)=(n),(n)->next=0))
+#define DLLPushBack(f,l,n) DLLPushBack_NP(f,l,n,next,prev)
+
+#define DLLPushFront(f,l,n) DLLPushBack_NP(l,f,n,prev,next)
+
+#define DLLRemove_NP(f,l,n,next,prev) (((f)==(n)?\
+((f)=(f)->next,(f)->prev=0):\
+(l)==(n)?\
+((l)=(l)->prev,(l)->next=0):\
+((n)->next->prev=(n)->prev,\
+(n)->prev->next=(n)->next)))
+#define DLLRemove(f,l,n) DLLRemove(f,l,n,next,prev)
+
+#define SLLQueuePush_N(f,l,n,next) ((f)==0?\
+(f)=(l)=(n):\
+((l)->next=(n),(l)=(n)),\
+(n)->next=0)
+#define SLLQueuePush(f,l,n) SLLQueuePush_N(f,l,n,next)
+
+#define SLLQueuePushFront_N(f,l,n,next) ((f)==0?\
+((f)=(l)=(n),(n)->next=0):\
+((n)->next=(f),(f)=(n)))
+#define SLLQueuePushFront(f,l,n) SLLQueuePushFront_N(f,l,n,next)
+
+#define SLLQueuePop_N(f,l,next) ((f)==(l)?\
+(f)=(l)=0:\
+(f)=(f)->next)
+#define SLLQueuePop(f,l) SLLQueuePop_N(f,l,next)
+
+#define SLLStackPush_N(f,n,next) ((n)->next=(f),(f)=(n))
+#define SLLStackPush(f,n) SLLStackPush_N(f,n,next)
+
+#define SLLStackPop_N(f,next) ((f)==0?0:\
+(f)=(f)->next)
+#define SLLStackPop(f) SLLStackPop_N(f,next)
+
+////////////////////////////////
 // NOTE(allen): Basic Types
 
 #include <stdint.h>

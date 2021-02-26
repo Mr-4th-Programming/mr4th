@@ -1,8 +1,11 @@
-#include "base.h"
+#include "base_inc.h"
 
-#include "base.cpp"
+#include "base_inc.cpp"
 
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "base_memory_malloc.cpp"
 
 #define EvalPrint(x) printf("%s = %d\n", #x, (S32)(x))
 #define EvalPrintLL(x) printf("%s = %lld\n", #x, (S64)(x))
@@ -11,12 +14,13 @@
 #define EvalPrintF(x) printf("%s = %e [%f]\n", #x, (F64)(x), (F64)(x))
 #define EvalPrintB(x) printf("%s = %s\n", #x, (char*)((x)?"true":"false"))
 #define EvalPrintS(x) printf("%s = %s\n", #x, (char*)(x))
+#define EvalPrintStr8(x) printf("%s = %.*s\n", #x, str8_expand(x))
 
 struct Node{
     Node *next;
     Node *prev;
     
-    int x;
+    U64 x;
 };
 
 struct TestStruct{
@@ -27,20 +31,32 @@ struct TestStruct{
 };
 
 int main(){
-    Node nodes[10];
-    for (int i = 0; i < ArrayCount(nodes); i += 1){
+    String8 test_string = str8_lit("Hello World!");
+    
+    EvalPrintStr8(test_string);
+    EvalPrintStr8(str8_prefix(test_string, 5));
+    EvalPrintStr8(str8_postfix(test_string, 6));
+    EvalPrintStr8(str8_skip(test_string, 3));
+    EvalPrintStr8(str8_chop(test_string, 3));
+    
+    M_Arena arena = m_make_arena(m_malloc_base_memory());
+    
+    U64 node_count = 10;
+    Node *nodes = push_array(&arena, Node, node_count);
+    for (U64 i = 0; i < node_count; i += 1){
         nodes[i].x = i;
     }
     
     {
         Node *first = 0;
         Node *last = 0;
-        for (int i = 0; i < 10; i += 1){
+        for (U64 i = 0; i < node_count; i += 1){
             SLLStackPush(first, &nodes[i]);
         }
         SLLStackPop(first);
         SLLStackPop(first);
         SLLStackPop(first);
+        
         for (Node *node = first;
              node != 0;
              node = node->next){

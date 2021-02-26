@@ -61,6 +61,7 @@ function void    m_arena_pop_to(M_Arena *arena, U64 pos);
 function void*   m_arena_push_zero(M_Arena *arena, U64 size);
 function void    m_arena_align(M_Arena *arena, U64 pow2_align);
 function void    m_arena_align_zero(M_Arena *arena, U64 pow2_align);
+function void    m_arena_pop_amount(M_Arena *arena, U64 amount);
 
 #define push_array(a,T,c) (T*)m_arena_push((a), sizeof(T)*(c))
 #define push_array_zero(a,T,c) (T*)m_arena_push_zero((a), sizeof(T)*(c))

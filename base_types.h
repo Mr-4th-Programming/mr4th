@@ -257,6 +257,11 @@ typedef double F64;
 typedef void VoidFunc(void);
 
 ////////////////////////////////
+// NOTE(allen): Variadic Functions
+
+#include <stdarg.h>
+
+////////////////////////////////
 // NOTE(allen): Basic Constants
 
 global S8  min_S8  = (S8) 0x80;

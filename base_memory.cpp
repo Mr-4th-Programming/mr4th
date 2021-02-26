@@ -96,6 +96,13 @@ m_arena_align_zero(M_Arena *arena, U64 pow2_align){
     }
 }
 
+function void
+m_arena_pop_amount(M_Arena *arena, U64 amount){
+    if (amount <= arena->pos){
+        m_arena_pop_to(arena, arena->pos - amount);
+    }
+}
+
 ////////////////////////////////
 // NOTE(allen): Temp Helper Functions
 

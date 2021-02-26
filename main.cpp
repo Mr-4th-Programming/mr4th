@@ -31,7 +31,9 @@ struct TestStruct{
 };
 
 int main(){
-    String8 test_string = str8_lit("Hello World!");
+    M_Arena arena = m_make_arena(m_malloc_base_memory());
+    
+    String8 test_string = str8_pushf(&arena, "Hello %dth World!", 55);
     
     EvalPrintStr8(test_string);
     EvalPrintStr8(str8_prefix(test_string, 5));
@@ -39,7 +41,23 @@ int main(){
     EvalPrintStr8(str8_skip(test_string, 3));
     EvalPrintStr8(str8_chop(test_string, 3));
     
-    M_Arena arena = m_make_arena(m_malloc_base_memory());
+    String8List list = {};
+    str8_list_push(&arena, &list, str8_lit("Part 1"));
+    str8_list_push(&arena, &list, str8_lit("Part 2"));
+    str8_list_push(&arena, &list, str8_lit("Part 3"));
+    
+    StringJoin join_params = {};
+    join_params.mid = str8_lit("/");
+    String8 joined = str8_join(&arena, &list, &join_params);
+    EvalPrintStr8(joined);
+    
+    String8List split = str8_split(&arena, joined, (U8*)" ", 1);
+    for (String8Node *node = split.first;
+         node != 0;
+         node = node->next){
+        EvalPrintStr8(node->string);
+    }
+    
     
     U64 node_count = 10;
     Node *nodes = push_array(&arena, Node, node_count);

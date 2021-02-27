@@ -10,6 +10,7 @@
 #define EvalPrint(x) printf("%s = %d\n", #x, (S32)(x))
 #define EvalPrintLL(x) printf("%s = %lld\n", #x, (S64)(x))
 #define EvalPrintU(x) printf("%s = %u\n", #x, (U32)(x))
+#define EvalPrintX(x) printf("%s = %x\n", #x, (U32)(x))
 #define EvalPrintULL(x) printf("%s = %llu\n", #x, (U64)(x))
 #define EvalPrintF(x) printf("%s = %e [%f]\n", #x, (F64)(x), (F64)(x))
 #define EvalPrintB(x) printf("%s = %s\n", #x, (char*)((x)?"true":"false"))
@@ -32,6 +33,44 @@ struct TestStruct{
 
 int main(){
     M_Arena arena = m_make_arena(m_malloc_base_memory());
+    
+    // 1 000000 000000 000000
+    //  100 00000000 00000000
+    //    4    0   0    0   0
+    U8 utf8_test[] = { 0x40, 0xF1, 0x80, 0x80, 0x80, };
+    
+    StringDecode dec1 = str_decode_utf8(utf8_test, ArrayCount(utf8_test));
+    StringDecode dec2 = str_decode_utf8(utf8_test + dec1.size,
+                                        ArrayCount(utf8_test) - dec1.size);
+    EvalPrintX(dec1.codepoint);
+    EvalPrintX(dec2.codepoint);
+    
+    str_encode_utf8(utf8_test, 5000);
+    StringDecode dec3 = str_decode_utf8(utf8_test, 4);
+    EvalPrintU(dec3.codepoint);
+    
+    String8 test_string_array[] = {
+        str8_lit("A"),
+        str8_lit("Bee"),
+        str8_lit("Let's get some 90923923 in here!"),
+        // TODO(allen): test with direct string comparison
+        //str8_lit("\x01\x02\x03\x04\x05\x06\x07\x08\n\t\r"),
+    };
+    
+    for (U32 i = 0; i < ArrayCount(test_string_array); i += 1){
+        {
+            String32 string_32 = str32_from_str8(&arena, test_string_array[i]);
+            String8 string_8 = str8_from_str32(&arena, string_32);
+            EvalPrintStr8(string_8);
+        }
+        
+        {
+            String16 string_16 = str16_from_str8(&arena, test_string_array[i]);
+            String8 string_8 = str8_from_str16(&arena, string_16);
+            EvalPrintStr8(string_8);
+        }
+    }
+    
     
     String8 test_string = str8_pushf(&arena, "Hello %dth World!", 55);
     

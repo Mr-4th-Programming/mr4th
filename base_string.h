@@ -29,6 +29,24 @@ struct StringJoin{
     String8 post;
 };
 
+struct String16{
+    U16 *str;
+    U64 size;
+};
+
+struct String32{
+    U32 *str;
+    U64 size;
+};
+
+////////////////////////////////
+// NOTE(allen): Unicode Helper Types
+
+struct StringDecode{
+    U32 codepoint;
+    U32 size;
+};
+
 ////////////////////////////////
 // NOTE(allen): String Functions
 
@@ -59,5 +77,19 @@ function String8List str8_split(M_Arena *arena, String8 string,
 function String8 str8_pushfv(M_Arena *arena, char *fmt, va_list args);
 function String8 str8_pushf(M_Arena *arena, char *fmt, ...);
 function void    str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...);
+
+////////////////////////////////
+// NOTE(allen): Unicode Functions
+
+function StringDecode str_decode_utf8(U8 *str, U32 cap);
+function U32          str_encode_utf8(U8 *dst, U32 codepoint);
+function StringDecode str_decode_utf16(U16 *str, U32 cap);
+function U32          str_encode_utf16(U16 *dst, U32 codepoint);
+
+function String32     str32_from_str8(M_Arena *arena, String8 string);
+function String8      str8_from_str32(M_Arena *arena, String32 string);
+function String16     str16_from_str8(M_Arena *arena, String8 string);
+function String8      str8_from_str16(M_Arena *arena, String16 string);
+
 
 #endif //BASE_STRING_H

@@ -29,6 +29,11 @@ struct StringJoin{
     String8 post;
 };
 
+typedef U32 StringMatchFlags;
+enum{
+    StringMatchFlag_NoCase = 1 << 0,
+};
+
 struct String16{
     U16 *str;
     U64 size;
@@ -48,7 +53,13 @@ struct StringDecode{
 };
 
 ////////////////////////////////
-// NOTE(allen): String Functions
+// NOTE(allen): Character Functions
+
+function U8 str8_char_uppercase(U8 c);
+function U8 str8_char_lowercase(U8 c);
+
+////////////////////////////////
+// NOTE(allen): String Constructor Functions
 
 function String8 str8(U8 *str, U64 size);
 function String8 str8_range(U8 *first, U8 *opl);
@@ -77,6 +88,11 @@ function String8List str8_split(M_Arena *arena, String8 string,
 function String8 str8_pushfv(M_Arena *arena, char *fmt, va_list args);
 function String8 str8_pushf(M_Arena *arena, char *fmt, ...);
 function void    str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...);
+
+////////////////////////////////
+// NOTE(allen): String Comparison Functions
+
+function B32 str8_match(String8 a, String8 b, StringMatchFlags flags);
 
 ////////////////////////////////
 // NOTE(allen): Unicode Functions

@@ -1,5 +1,24 @@
 ////////////////////////////////
-// NOTE(allen): String Functions
+// NOTE(allen): Character Functions
+
+function U8
+str8_char_uppercase(U8 c){
+    if ('a' <= c && c <= 'z'){
+        c += 'A' - 'a';
+    }
+    return(c);
+}
+
+function U8
+str8_char_lowercase(U8 c){
+    if ('A' <= c && c <= 'Z'){
+        c += 'a' - 'A';
+    }
+    return(c);
+}
+
+////////////////////////////////
+// NOTE(allen): String Constructor Functions
 
 function String8
 str8(U8 *str, U64 size){
@@ -212,6 +231,31 @@ str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...){
     String8 string = str8_pushfv(arena, fmt, args);
     va_end(args);
     str8_list_push(arena, list, string);
+}
+
+////////////////////////////////
+// NOTE(allen): String Comparison Functions
+
+function B32
+str8_match(String8 a, String8 b, StringMatchFlags flags){
+    B32 result = false;
+    if (a.size == b.size){
+        result = true;
+        B32 no_case = ((flags & StringMatchFlag_NoCase) != 0);
+        for (U64 i = 0; i < a.size; i += 1){
+            U8 ac = a.str[i];
+            U8 bc = b.str[i];
+            if (no_case){
+                ac = str8_char_uppercase(ac);
+                bc = str8_char_uppercase(bc);
+            }
+            if (ac != bc){
+                result = false;
+                break;
+            }
+        }
+    }
+    return(result);
 }
 
 ////////////////////////////////

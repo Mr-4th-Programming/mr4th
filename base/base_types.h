@@ -188,15 +188,6 @@ Min(sizeof(*(d)),sizeof(*(s)))*(c))
 ////////////////////////////////
 // NOTE(allen): Linked List Macros
 
-// TODO(allen): 
-//  Singly Linked List Queue
-//   PushBack
-//   PushFront
-//   Pop
-//  Singly Linked List Stack
-//   Push
-//   Pop
-
 #define DLLPushBack_NP(f,l,n,next,prev) ((f)==0?\
 ((f)=(l)=(n),(n)->next=(n)->prev=0):\
 ((n)->prev=(l),(l)->next=(n),(l)=(n),(n)->next=0))

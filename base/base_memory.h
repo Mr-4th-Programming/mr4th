@@ -38,6 +38,7 @@ struct M_TempBlock{
     
     M_TempBlock(M_Arena *arena);
     ~M_TempBlock(void);
+    operator M_Arena*(void);
     void reset(void);
 };
 

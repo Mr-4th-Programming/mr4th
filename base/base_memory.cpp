@@ -125,7 +125,12 @@ M_TempBlock::~M_TempBlock(void){
     m_end_temp(this->temp);
 }
 
+M_TempBlock::operator M_Arena*(void){
+    return(this->temp.arena);
+}
+
 void
 M_TempBlock::reset(void){
     m_end_temp(this->temp);
 }
+

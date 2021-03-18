@@ -27,4 +27,20 @@ int main(){
     printf("scratch:       %p\nother_scratch: %p\n",
            scratch.temp.arena,
            other_scratch.temp.arena);
+    
+    os_file_write(str8_lit("foo.txt"), str8_lit("Bar text\n"));
+    
+    String8 my_file_data = os_file_read(scratch, str8_lit("foo.txt"));
+    printf("%.*s", str8_expand(my_file_data));
+    
+    {
+        FileProperties props = os_file_properties(str8_lit("foo.txt"));
+        printf("size: %llu\nis folder? %s\n", props.size, (props.flags & FilePropertyFlag_IsFolder)?"yes":"no");
+    }
+    
+    {
+        FileProperties props = os_file_properties(str8_lit("foo"));
+        printf("size: %llu\nis folder? %s\n", props.size, (props.flags & FilePropertyFlag_IsFolder)?"yes":"no");
+    }
 }
+

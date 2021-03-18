@@ -27,7 +27,7 @@ commands = {
    .linux = "./build.sh",
    .mac = "./build.sh", },
  .run = { .out = "*run*", .footer_panel = false, .save_dirty_files = false,
-   .win = "build\\test",
+   .win = "pushd build & test",
    .linux = "build/test",
    .mac = "build/test", },
 };

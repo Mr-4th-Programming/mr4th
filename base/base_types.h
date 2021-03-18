@@ -438,6 +438,37 @@ union I2F32{
 };
 
 ////////////////////////////////
+// NOTE(allen): Data Access Flags
+
+typedef U32 DataAccessFlags;
+enum{
+    DataAccessFlag_Read    = (1 << 0),
+    DataAccessFlag_Write   = (1 << 1),
+    DataAccessFlag_Execute = (1 << 2),
+};
+
+////////////////////////////////
+// NOTE(allen): Time
+
+typedef U64 DenseTime;
+
+////////////////////////////////
+// NOTE(allen): File Properties
+
+typedef U32 FilePropertyFlags;
+enum{
+    FilePropertyFlag_IsFolder = (1 << 0),
+};
+
+struct FileProperties{
+    U64 size;
+    FilePropertyFlags flags;
+    DenseTime create_time;
+    DenseTime modify_time;
+    DataAccessFlags access;
+};
+
+////////////////////////////////
 // NOTE(allen): Symbolic Constant Functions
 
 function OperatingSystem operating_system_from_context(void);

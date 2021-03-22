@@ -4,6 +4,13 @@
 #define OS_ESSENTIAL_H
 
 ////////////////////////////////
+// NOTE(allen): File Iterator
+
+struct OS_FileIter{
+    U8 v[640];
+};
+
+////////////////////////////////
 // NOTE(allen): Setup
 
 function void os_init(void);
@@ -29,5 +36,16 @@ function String8 os_file_read(M_Arena *arena, String8 file_name);
 function B32     os_file_write(String8 file_name, String8List data);
 
 function FileProperties os_file_properties(String8 file_name);
+
+function B32 os_file_delete(String8 file_name);
+function B32 os_file_rename(String8 og_name, String8 new_name);
+function B32 os_file_make_directory(String8 path);
+function B32 os_file_delete_directory(String8 path);
+
+function OS_FileIter os_file_iter_init(String8 path);
+function B32  os_file_iter_next(M_Arena *arena, OS_FileIter *iter,
+                                String8 *name_out, FileProperties *prop_out);
+function void os_file_iter_end(OS_FileIter *iter);
+
 
 #endif //OS_ESSENTIAL_H

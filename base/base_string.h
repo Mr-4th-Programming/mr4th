@@ -89,6 +89,8 @@ function String8 str8_pushfv(M_Arena *arena, char *fmt, va_list args);
 function String8 str8_pushf(M_Arena *arena, char *fmt, ...);
 function void    str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...);
 
+function String16 str16_cstring(U16 *cstr);
+
 ////////////////////////////////
 // NOTE(allen): String Comparison Functions
 

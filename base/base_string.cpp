@@ -233,6 +233,14 @@ str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...){
     str8_list_push(arena, list, string);
 }
 
+function String16
+str16_cstring(U16 *cstr){
+    U16 *ptr = cstr;
+    for (;*ptr != 0; ptr += 1);
+    String16 result = {cstr, (U64)(ptr - cstr)};
+    return(result);
+}
+
 ////////////////////////////////
 // NOTE(allen): String Comparison Functions
 

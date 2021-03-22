@@ -134,6 +134,8 @@
 # define Assert(c)
 #endif
 
+#define StaticAssert(c,l) typedef U8 Glue(l,__LINE__) [(c)?1:-1]
+
 #define Stringify_(S) #S
 #define Stringify(S) Stringify_(S)
 #define Glue_(A,B) A##B

@@ -1,6 +1,11 @@
 ////////////////////////////////
 // NOTE(allen): Character Functions
 
+function B32
+str8_char_is_slash(U8 c){
+    return(c == '/' || c == '\\');
+}
+
 function U8
 str8_char_uppercase(U8 c){
     if ('a' <= c && c <= 'z'){
@@ -233,11 +238,49 @@ str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...){
     str8_list_push(arena, list, string);
 }
 
+function String8
+str8_push_copy(M_Arena *arena, String8 string){
+    String8 result = {};
+    result.str = push_array(arena, U8, string.size + 1);
+    result.size = string.size;
+    MemoryCopy(result.str, string.str, string.size);
+    result.str[result.size] = 0;
+    return(result);
+}
+
+function String16
+str16(U16 *str, U64 size){
+    String16 result = {str, size};
+    return(result);
+}
+
 function String16
 str16_cstring(U16 *cstr){
     U16 *ptr = cstr;
     for (;*ptr != 0; ptr += 1);
     String16 result = {cstr, (U64)(ptr - cstr)};
+    return(result);
+}
+
+////////////////////////////////
+// NOTE(allen): String Path Helpers
+
+function String8
+str8_chop_last_slash(String8 string){
+    String8 result = string;
+    if (string.size > 0){
+        // pos one past last slash
+        U64 pos = string.size;
+        for (S64 i = string.size - 1; i >= 0; i -= 1){
+            if (str8_char_is_slash(string.str[i])){
+                pos = i;
+                break;
+            }
+        }
+        
+        // chop result string
+        result.size = pos;
+    }
     return(result);
 }
 

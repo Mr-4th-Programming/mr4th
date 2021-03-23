@@ -55,6 +55,8 @@ struct StringDecode{
 ////////////////////////////////
 // NOTE(allen): Character Functions
 
+function B32 str8_char_is_slash(U8 c);
+
 function U8 str8_char_uppercase(U8 c);
 function U8 str8_char_lowercase(U8 c);
 
@@ -89,7 +91,15 @@ function String8 str8_pushfv(M_Arena *arena, char *fmt, va_list args);
 function String8 str8_pushf(M_Arena *arena, char *fmt, ...);
 function void    str8_list_pushf(M_Arena *arena, String8List *list, char *fmt, ...);
 
+function String8 str8_push_copy(M_Arena *arena, String8 string);
+
+function String16 str16(U16 *str, U64 size);
 function String16 str16_cstring(U16 *cstr);
+
+////////////////////////////////
+// NOTE(allen): String Path Helpers
+
+function String8 str8_chop_last_slash(String8 string);
 
 ////////////////////////////////
 // NOTE(allen): String Comparison Functions

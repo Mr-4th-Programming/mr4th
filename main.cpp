@@ -157,5 +157,17 @@ int main(){
         Assert(now.mon == round_trip.mon);
         Assert(now.year == round_trip.year);
     }
+    
+    String8 cwd = os_file_path(scratch, OS_SystemPath_CurrentDirectory);
+    printf("cwd: %.*s\n", str8_expand(cwd));
+    
+    String8 bin_path = os_file_path(scratch, OS_SystemPath_Binary);
+    printf("bin_path: %.*s\n", str8_expand(bin_path));
+    
+    String8 user_path = os_file_path(scratch, OS_SystemPath_UserData);
+    printf("user_path: %.*s\n", str8_expand(user_path));
+    
+    String8 temp_path = os_file_path(scratch, OS_SystemPath_TempData);
+    printf("temp_path: %.*s\n", str8_expand(temp_path));
 }
 

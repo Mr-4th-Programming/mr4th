@@ -10,6 +10,8 @@
 #include <Windows.h>
 #define function static
 
+#include <userenv.h>
+
 ////////////////////////////////
 // NOTE(allen): Win32 File Iter
 

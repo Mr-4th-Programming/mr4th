@@ -164,6 +164,11 @@
 #define GB(x) ((x) << 30)
 #define TB(x) ((x) << 40)
 
+#define Thousand(x) ((x)*1000)
+#define Million(x)  ((x)*1000000llu)
+#define Billion(x)  ((x)*1000000000llu)
+#define Trillion(x) ((x)*1000000000000llu)
+
 #define global static
 #define local  static
 #define function static
@@ -454,6 +459,16 @@ enum{
 
 typedef U64 DenseTime;
 
+struct DateTime{
+    U16 msec; // [0,999]
+    U8 sec;   // [0,60]
+    U8 min;   // [0,59]
+    U8 hour;  // [0,23]
+    U8 day;   // [0,30]
+    U8 mon;   // [1,12]
+    S16 year; // 1 = 1 CE; 2020 = 2020 CE; 0 = 1 BCE; -100 = 101 BCE; etc.
+};
+
 ////////////////////////////////
 // NOTE(allen): File Properties
 
@@ -574,5 +589,11 @@ function F32 intr_center(I1F32 r);
 function V2F32 intr_center(I2F32 r);
 
 function I1F32 intr_axis(I2F32 r, Axis axis);
+
+////////////////////////////////
+// NOTE(allen): Time Functions
+
+function DenseTime dense_time_from_date_time(DateTime *date_time);
+function DateTime  date_time_from_dense_time(DenseTime dense_time);
 
 #endif //BASE_H

@@ -590,3 +590,47 @@ intr_axis(I2F32 r, Axis axis){
     return(result);
 }
 
+////////////////////////////////
+// NOTE(allen): Time Functions
+
+function DenseTime
+dense_time_from_date_time(DateTime *in){
+    U32 year_encoded = (U32)((S32)in->year + 0x8000);
+    DenseTime result = 0;
+    result += year_encoded;
+    result *= 12;
+    result += (in->mon - 1);
+    result *= 31;
+    result += in->day;
+    result *= 24;
+    result += in->hour;
+    result *= 60;
+    result += in->min;
+    result *= 61;
+    result += in->sec;
+    result *= 1000;
+    result += in->msec;
+    return(result);
+}
+
+function DateTime
+date_time_from_dense_time(DenseTime in){
+    DateTime result = {};
+    result.msec = in%1000;
+    in /= 1000;
+    result.sec = in%61;
+    in /= 61;
+    result.min = in%60;
+    in /= 60;
+    result.hour = in%24;
+    in /= 24;
+    result.day = in%31;
+    in /= 31;
+    result.mon = (in%12) + 1;
+    in /= 12;
+    S32 year_encoded = (S32)in;
+    result.year = (year_encoded - 0x8000);
+    return(result);
+}
+
+

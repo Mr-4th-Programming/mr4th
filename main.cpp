@@ -45,6 +45,11 @@ int main(){
     {
         FileProperties props = os_file_properties(str8_lit("foo"));
         printf("size: %llu\nis folder? %s\n", props.size, (props.flags & FilePropertyFlag_IsFolder)?"yes":"no");
+        
+        DateTime time = date_time_from_dense_time(props.create_time);
+        printf("%04d, %02d, %02d; %02d:%02d:%02d.%03d\n",
+               time.year, time.mon, time.day,
+               time.hour, time.min, time.sec, time.msec);
     }
     
     // delete
@@ -107,5 +112,50 @@ int main(){
         printf(" %.*s\n", str8_expand(name));
     }
     os_file_iter_end(&iter);
+    
+    // date time encode/decode test
+    {
+        DateTime date_time = {};
+        date_time.msec = 501;
+        date_time.sec = 1;
+        date_time.min = 0;
+        date_time.hour = 23;
+        date_time.day = 0;
+        date_time.mon = 10;
+        date_time.year = -100;
+        
+        DenseTime dense = dense_time_from_date_time(&date_time);
+        DateTime decoded = date_time_from_dense_time(dense);
+        
+        Assert(date_time.msec == decoded.msec);
+        Assert(date_time.sec == decoded.sec);
+        Assert(date_time.min == decoded.min);
+        Assert(date_time.hour == decoded.hour);
+        Assert(date_time.day == decoded.day);
+        Assert(date_time.mon == decoded.mon);
+        Assert(date_time.year == decoded.year);
+    }
+    
+    // now date time; local time conversion
+    {
+        DateTime now = os_now_universal_time();
+        printf("%04d, %02d, %02d; %02d:%02d:%02d.%03d\n",
+               now.year, now.mon, now.day,
+               now.hour, now.min, now.sec, now.msec);
+        
+        DateTime now_local = os_local_time_from_universal(&now);
+        printf("%04d, %02d, %02d; %02d:%02d:%02d.%03d\n",
+               now_local.year, now_local.mon, now_local.day,
+               now_local.hour, now_local.min, now_local.sec, now_local.msec);
+        
+        DateTime round_trip = os_universal_time_from_local(&now_local);
+        Assert(now.msec == round_trip.msec);
+        Assert(now.sec == round_trip.sec);
+        Assert(now.min == round_trip.min);
+        Assert(now.hour == round_trip.hour);
+        Assert(now.day == round_trip.day);
+        Assert(now.mon == round_trip.mon);
+        Assert(now.year == round_trip.year);
+    }
 }
 

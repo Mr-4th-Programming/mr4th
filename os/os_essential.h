@@ -47,5 +47,14 @@ function B32  os_file_iter_next(M_Arena *arena, OS_FileIter *iter,
                                 String8 *name_out, FileProperties *prop_out);
 function void os_file_iter_end(OS_FileIter *iter);
 
+////////////////////////////////
+// NOTE(allen): Time
+
+function DateTime os_now_universal_time(void);
+function DateTime os_local_time_from_universal(DateTime *date_time);
+function DateTime os_universal_time_from_local(DateTime *date_time);
+
+function U64  os_now_microseconds(void);
+function void os_sleep_milliseconds(U32 t);
 
 #endif //OS_ESSENTIAL_H

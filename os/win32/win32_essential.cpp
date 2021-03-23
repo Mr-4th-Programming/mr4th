@@ -1,15 +1,23 @@
 ////////////////////////////////
 // NOTE(allen): Variables
 
-global DWORD win32_thread_context_index = 0;
-
+global DWORD w32_thread_context_index = 0;
+global U64 w32_ticks_per_second = 1;
 
 ////////////////////////////////
 // NOTE(allen): Init
 
 function void
 os_init(void){
-    win32_thread_context_index = TlsAlloc();
+    // setup thread contexts
+    w32_thread_context_index = TlsAlloc();
+    
+    // setup precision time
+    LARGE_INTEGER perf_freq = {};
+    if (QueryPerformanceFrequency(&perf_freq)){
+        w32_ticks_per_second = ((U64)perf_freq.HighPart << 32) | perf_freq.LowPart;
+    }
+    timeBeginPeriod(1);
 }
 
 ////////////////////////////////
@@ -41,22 +49,50 @@ os_memory_release(void *ptr, U64 size){
 
 function void
 os_thread_context_set(void *ptr){
-    TlsSetValue(win32_thread_context_index, ptr);
+    TlsSetValue(w32_thread_context_index, ptr);
 }
 
 function void*
 os_thread_context_get(void){
-    void *result = TlsGetValue(win32_thread_context_index);
+    void *result = TlsGetValue(w32_thread_context_index);
     return(result);
 }
 
 ////////////////////////////////
 // NOTE(allen): Time
 
+function DateTime
+w32_date_time_from_system_time(SYSTEMTIME *in){
+    DateTime result = {};
+    result.year = in->wYear;
+    result.mon  = (U8)in->wMonth;
+    result.day  = in->wDay - 1;
+    result.hour = in->wHour;
+    result.min  = in->wMinute;
+    result.sec  = in->wSecond;
+    result.msec = in->wMilliseconds;
+    return(result);
+}
+
+function SYSTEMTIME
+w32_system_time_from_date_time(DateTime *in){
+    SYSTEMTIME result = {};
+    result.wYear = in->year;
+    result.wMonth = in->mon;
+    result.wDay = in->day + 1;
+    result.wHour = in->hour;
+    result.wMinute = in->min;
+    result.wSecond = in->sec;
+    result.wMilliseconds = in->msec;
+    return(result);
+}
+
 function DenseTime
 w32_dense_time_from_file_time(FILETIME *file_time){
-    DenseTime result = 0;
-    // TODO(allen): 
+    SYSTEMTIME system_time = {};
+    FileTimeToSystemTime(file_time, &system_time);
+    DateTime date_time = w32_date_time_from_system_time(&system_time);
+    DenseTime result = dense_time_from_date_time(&date_time);
     return(result);
 }
 
@@ -311,3 +347,55 @@ os_file_iter_end(OS_FileIter *iter){
     }
 }
 
+////////////////////////////////
+// NOTE(allen): Time
+
+function DateTime
+os_now_universal_time(void){
+    SYSTEMTIME system_time = {};
+    GetSystemTime(&system_time);
+    DateTime result = w32_date_time_from_system_time(&system_time);
+    return(result);
+}
+
+function DateTime
+os_local_time_from_universal(DateTime *univ_date_time){
+    SYSTEMTIME univ_system_time = w32_system_time_from_date_time(univ_date_time);
+    FILETIME univ_file_time = {};
+    SystemTimeToFileTime(&univ_system_time, &univ_file_time);
+    FILETIME local_file_time = {};
+    FileTimeToLocalFileTime(&univ_file_time, &local_file_time);
+    SYSTEMTIME local_system_time = {};
+    FileTimeToSystemTime(&local_file_time, &local_system_time);
+    DateTime result = w32_date_time_from_system_time(&local_system_time);
+    return(result);
+}
+
+function DateTime
+os_universal_time_from_local(DateTime *local_date_time){
+    SYSTEMTIME local_system_time = w32_system_time_from_date_time(local_date_time);
+    FILETIME local_file_time = {};
+    SystemTimeToFileTime(&local_system_time, &local_file_time);
+    FILETIME univ_file_time = {};
+    LocalFileTimeToFileTime(&local_file_time, &univ_file_time);
+    SYSTEMTIME univ_system_time = {};
+    FileTimeToSystemTime(&univ_file_time, &univ_system_time);
+    DateTime result = w32_date_time_from_system_time(&univ_system_time);
+    return(result);
+}
+
+function U64
+os_now_microseconds(void){
+    U64 result = 0;
+    LARGE_INTEGER perf_counter = {};
+    if (QueryPerformanceCounter(&perf_counter)){
+        U64 ticks = ((U64)perf_counter.HighPart << 32) | perf_counter.LowPart;
+        result = ticks*Million(1)/w32_ticks_per_second;
+    }
+    return(result);
+}
+
+function void
+os_sleep_milliseconds(U32 t){
+    Sleep(t);
+}

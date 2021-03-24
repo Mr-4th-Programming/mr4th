@@ -4,18 +4,6 @@
 #define OS_HELPERS_H
 
 ////////////////////////////////
-// NOTE(allen): Thread Context
-
-#if !defined(OS_SCRATCH_POOL_CAP)
-# define OS_SCRATCH_POOL_CAP 4
-#endif
-
-struct OS_ThreadContext{
-    M_BaseMemory *memory;
-    M_Arena scratch_pool[OS_SCRATCH_POOL_CAP];
-};
-
-////////////////////////////////
 // NOTE(allen): Base Memory
 
 function M_BaseMemory* os_base_memory(void);

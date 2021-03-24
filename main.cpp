@@ -10,11 +10,19 @@
 
 #include "base/base_memory_malloc.cpp"
 
-int main(){
-    os_init();
-    
+int main(int argc, char **argv){
     OS_ThreadContext tctx_memory = {};
-    os_thread_init(&tctx_memory);
+    os_main_init(&tctx_memory, argc, argv);
+    
+    {
+        String8List cmd_line = os_command_line_arguments();
+        U64 counter = 0;
+        for (String8Node *node = cmd_line.first;
+             node != 0;
+             node = node->next, counter += 1){
+            printf("%2llu: '%.*s'\n", counter, str8_expand(node->string));
+        }
+    }
     
     M_Scratch scratch;
     int *foo = push_array(scratch, int, 1000);

@@ -4,6 +4,18 @@
 #define OS_ESSENTIAL_H
 
 ////////////////////////////////
+// NOTE(allen): Thread Context
+
+#if !defined(OS_SCRATCH_POOL_CAP)
+# define OS_SCRATCH_POOL_CAP 4
+#endif
+
+struct OS_ThreadContext{
+    M_BaseMemory *memory;
+    M_Arena scratch_pool[OS_SCRATCH_POOL_CAP];
+};
+
+////////////////////////////////
 // NOTE(allen): File Iterator
 
 struct OS_FileIter{
@@ -24,7 +36,9 @@ enum OS_SystemPath{
 ////////////////////////////////
 // NOTE(allen): Setup
 
-function void os_init(void);
+function void os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv);
+
+function String8List os_command_line_arguments(void);
 
 ////////////////////////////////
 // NOTE(allen): Memory Functions

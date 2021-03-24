@@ -9,13 +9,18 @@ global String8 w32_binary_path = {};
 global String8 w32_user_path = {};
 global String8 w32_temp_path = {};
 
+global String8List w32_cmd_line = {};
+
 ////////////////////////////////
 // NOTE(allen): Init
 
 function void
-os_init(void){
+os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
     // setup thread contexts
     w32_thread_context_index = TlsAlloc();
+    
+    // this thread's context
+    os_thread_init(tctx_memory);
     
     // setup precision time
     LARGE_INTEGER perf_freq = {};
@@ -27,8 +32,28 @@ os_init(void){
     // arena
     w32_perm_arena = m_make_arena(os_base_memory());
     
-    // TODO(allen): setup main thread's context here
-    // so we can init file paths and stuff?
+    // command line arguments
+    for (int i = 0; i < argc; i += 1){
+        String8 arg = str8_cstring((U8*)argv[i]);
+        str8_list_push(&w32_perm_arena, &w32_cmd_line, arg);
+    }
+}
+
+function void
+w32_WinMain_init(OS_ThreadContext *tctx_memory,
+                 HINSTANCE hInstance,
+                 HINSTANCE hPrevInstance,
+                 LPSTR     lpCmdLine,
+                 int       nShowCmd){
+    int argc = __argc;
+    char **argv = __argv;
+    os_main_init(tctx_memory, argc, argv);
+}
+
+function String8List
+os_command_line_arguments(void){
+    String8List result = w32_cmd_line;
+    return(result);
 }
 
 ////////////////////////////////

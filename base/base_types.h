@@ -177,6 +177,14 @@
 #define c_linkage_end   }
 #define c_linkage extern "C"
 
+#if COMPILER_CL
+# define shared_export __declspec(dllexport)
+#else
+# error shared_export not defined for this compiler
+#endif
+
+#define shared_function c_linkage shared_export
+
 #include <string.h>
 #define MemoryZero(p,z) memset((p), 0, (z))
 #define MemoryZeroStruct(p) MemoryZero((p), sizeof(*(p)))

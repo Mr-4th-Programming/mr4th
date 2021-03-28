@@ -10,6 +10,8 @@
 
 #include "base/base_memory_malloc.cpp"
 
+typedef U32 U32SumFunction(U32 *vals, U64 count);
+
 int main(int argc, char **argv){
     OS_ThreadContext tctx_memory = {};
     os_main_init(&tctx_memory, argc, argv);
@@ -177,5 +179,17 @@ int main(int argc, char **argv){
     
     String8 temp_path = os_file_path(scratch, OS_SystemPath_TempData);
     printf("temp_path: %.*s\n", str8_expand(temp_path));
+    
+    // libraries
+    OS_Library lib = os_lib_load(str8_lit("test_dll.dll"));
+    U32SumFunction *sum_func = (U32SumFunction*)os_lib_get_proc(lib, "u32_sum");
+    if (sum_func == 0){
+        printf("didn't get sum function\n");
+    }
+    else{
+        U32 x[] = {100, 44, 99, 101, 202, 51, 30};
+        U32 r = sum_func(x, ArrayCount(x));
+        printf("sum = %u\n", r);
+    }
 }
 

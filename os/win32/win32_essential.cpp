@@ -535,3 +535,29 @@ function void
 os_sleep_milliseconds(U32 t){
     Sleep(t);
 }
+
+////////////////////////////////
+// NOTE(allen): Libraries
+
+function OS_Library
+os_lib_load(String8 path){
+    OS_Library result = {};
+    M_Scratch scratch;
+    String16 path16 = str16_from_str8(scratch, path);
+    result.v[0] = (U64)(LoadLibraryW((WCHAR*)path16.str));
+    return(result);
+}
+
+function VoidFunc*
+os_lib_get_proc(OS_Library lib, char *name){
+    HMODULE module = (HMODULE)(lib.v[0]);
+    VoidFunc *result = (VoidFunc*)(GetProcAddress(module, name));
+    return(result);
+}
+
+function void
+os_lib_release(OS_Library lib){
+    HMODULE module = (HMODULE)(lib.v[0]);
+    FreeLibrary(module);
+}
+

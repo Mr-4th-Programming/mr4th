@@ -34,6 +34,13 @@ enum OS_SystemPath{
 };
 
 ////////////////////////////////
+// NOTE(allen): Libraries
+
+struct OS_Library{
+    U64 v[1];
+};
+
+////////////////////////////////
 // NOTE(allen): Setup
 
 function void os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv);
@@ -83,5 +90,12 @@ function DateTime os_universal_time_from_local(DateTime *date_time);
 
 function U64  os_now_microseconds(void);
 function void os_sleep_milliseconds(U32 t);
+
+////////////////////////////////
+// NOTE(allen): Libraries
+
+function OS_Library os_lib_load(String8 path);
+function VoidFunc*  os_lib_get_proc(OS_Library lib, char *name);
+function void       os_lib_release(OS_Library lib);
 
 #endif //OS_ESSENTIAL_H

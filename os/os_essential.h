@@ -98,4 +98,9 @@ function OS_Library os_lib_load(String8 path);
 function VoidFunc*  os_lib_get_proc(OS_Library lib, char *name);
 function void       os_lib_release(OS_Library lib);
 
+////////////////////////////////
+// NOTE(allen): Entropy
+
+function void os_get_entropy(void *data, U64 size);
+
 #endif //OS_ESSENTIAL_H

@@ -8,6 +8,9 @@
 
 function M_BaseMemory* os_base_memory(void);
 
+function M_Arena os_make_arena_reserve(U64 reserve_size);
+function M_Arena os_make_arena(void);
+
 ////////////////////////////////
 // NOTE(allen): Thread Self Init
 

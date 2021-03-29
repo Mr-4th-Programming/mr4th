@@ -472,7 +472,7 @@ struct DateTime{
     U8 sec;   // [0,60]
     U8 min;   // [0,59]
     U8 hour;  // [0,23]
-    U8 day;   // [0,30]
+    U8 day;   // [1,31]
     U8 mon;   // [1,12]
     S16 year; // 1 = 1 CE; 2020 = 2020 CE; 0 = 1 BCE; -100 = 101 BCE; etc.
 };

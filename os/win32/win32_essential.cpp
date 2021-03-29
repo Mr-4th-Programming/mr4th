@@ -37,6 +37,70 @@ os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
         String8 arg = str8_cstring((U8*)argv[i]);
         str8_list_push(&w32_perm_arena, &w32_cmd_line, arg);
     }
+    
+    // paths
+    M_Scratch scratch;
+    
+    // binary path
+    {
+        DWORD cap = 2048;
+        U16 *buffer = 0;
+        DWORD size = 0;
+        for (U64 r = 0; r < 4; r += 1, cap *= 4){
+            U16 *try_buffer = push_array(scratch, U16, cap);
+            DWORD try_size = GetModuleFileNameW(0, (WCHAR*)try_buffer, cap);
+            if (try_size == cap && GetLastError() == ERROR_INSUFFICIENT_BUFFER){
+                scratch.reset();
+            }
+            else{
+                buffer = try_buffer;
+                size = try_size;
+                break;
+            }
+        }
+        
+        String8 full_path = str8_from_str16(scratch, str16(buffer, size));
+        String8 binary_path = str8_chop_last_slash(full_path);
+        w32_binary_path = str8_push_copy(&w32_perm_arena, binary_path);
+    }
+    
+    // user data
+    {
+        HANDLE token = GetCurrentProcessToken();
+        DWORD cap = 2048;
+        U16 *buffer = push_array(scratch, U16, cap);
+        if (!GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
+            scratch.reset();
+            buffer = push_array(scratch, U16, cap + 1);
+            if (GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
+                buffer = 0;
+            }
+        }
+        
+        if (buffer != 0){
+            // NOTE(allen): the docs make it sound like we can only count on
+            // cap getting the size on failure; so we're just going to cstring
+            // this to be safe.
+            w32_user_path = str8_from_str16(&w32_perm_arena, str16_cstring(buffer));
+        }
+    }
+    
+    // temp data
+    {
+        DWORD cap = 2048;
+        U16 *buffer = push_array(scratch, U16, cap);
+        DWORD size = GetTempPathW(cap, (WCHAR*)buffer);
+        if (size >= cap){
+            scratch.reset();
+            buffer = push_array(scratch, U16, size + 1);
+            size = GetTempPathW(size + 1, (WCHAR*)buffer);
+        }
+        
+        // NOTE(allen): size - 1, because this particular string function
+        // in the Win32 API is different from the others and it includes 
+        // the trailing backslash. We want consistency, so the "- 1" removes it.
+        w32_temp_path = str8_from_str16(&w32_perm_arena, str16(buffer, size - 1));
+    }
 }
 
 function void
@@ -102,7 +166,7 @@ w32_date_time_from_system_time(SYSTEMTIME *in){
     DateTime result = {};
     result.year = in->wYear;
     result.mon  = (U8)in->wMonth;
-    result.day  = in->wDay - 1;
+    result.day  = in->wDay;
     result.hour = in->wHour;
     result.min  = in->wMinute;
     result.sec  = in->wSecond;
@@ -115,7 +179,7 @@ w32_system_time_from_date_time(DateTime *in){
     SYSTEMTIME result = {};
     result.wYear = in->year;
     result.wMonth = in->mon;
-    result.wDay = in->day + 1;
+    result.wDay = in->day;
     result.wHour = in->hour;
     result.wMinute = in->min;
     result.wSecond = in->sec;
@@ -404,77 +468,16 @@ os_file_path(M_Arena *arena, OS_SystemPath path){
         
         case OS_SystemPath_Binary:
         {
-            if (w32_binary_path.str == 0){
-                M_Scratch scratch(arena);
-                DWORD cap = 2048;
-                U16 *buffer = 0;
-                DWORD size = 0;
-                for (U64 r = 0; r < 4; r += 1, cap *= 4){
-                    U16 *try_buffer = push_array(scratch, U16, cap);
-                    DWORD try_size = GetModuleFileNameW(0, (WCHAR*)try_buffer, cap);
-                    if (try_size == cap && GetLastError() == ERROR_INSUFFICIENT_BUFFER){
-                        scratch.reset();
-                    }
-                    else{
-                        buffer = try_buffer;
-                        size = try_size;
-                        break;
-                    }
-                }
-                
-                String8 full_path = str8_from_str16(scratch, str16(buffer, size));
-                String8 binary_path = str8_chop_last_slash(full_path);
-                w32_binary_path = str8_push_copy(&w32_perm_arena, binary_path);
-            }
-            
             result = str8_push_copy(arena, w32_binary_path);
         }break;
         
         case OS_SystemPath_UserData:
         {
-            if (w32_user_path.str == 0){
-                M_Scratch scratch(arena);
-                HANDLE token = GetCurrentProcessToken();
-                DWORD cap = 2048;
-                U16 *buffer = push_array(scratch, U16, cap);
-                if (!GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
-                    scratch.reset();
-                    buffer = push_array(scratch, U16, cap + 1);
-                    if (GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
-                        buffer = 0;
-                    }
-                }
-                
-                if (buffer != 0){
-                    // NOTE(allen): the docs make it sound like we can only count on
-                    // cap getting the size on failure; so we're just going to cstring
-                    // this to be safe.
-                    w32_user_path = str8_from_str16(&w32_perm_arena, str16_cstring(buffer));
-                }
-            }
-            
             result = str8_push_copy(arena, w32_user_path);
         }break;
         
         case OS_SystemPath_TempData:
         {
-            if (w32_temp_path.str == 0){
-                M_Scratch scratch(arena);
-                DWORD cap = 2048;
-                U16 *buffer = push_array(scratch, U16, cap);
-                DWORD size = GetTempPathW(cap, (WCHAR*)buffer);
-                if (size >= cap){
-                    scratch.reset();
-                    buffer = push_array(scratch, U16, size + 1);
-                    size = GetTempPathW(size + 1, (WCHAR*)buffer);
-                }
-                
-                // NOTE(allen): size - 1, because this particular string function
-                // in the Win32 API is different from the others and it includes 
-                // the trailing backslash. We want consistency, so the "- 1" removes it.
-                w32_temp_path = str8_from_str16(&w32_perm_arena, str16(buffer, size - 1));
-            }
-            
             result = str8_push_copy(arena, w32_temp_path);
         }break;
     }
@@ -559,5 +562,16 @@ function void
 os_lib_release(OS_Library lib){
     HMODULE module = (HMODULE)(lib.v[0]);
     FreeLibrary(module);
+}
+
+////////////////////////////////
+// NOTE(allen): Entropy
+
+function void
+os_get_entropy(void *data, U64 size){
+    HCRYPTPROV prov = 0;
+    CryptAcquireContextW(&prov, 0, 0, PROV_DSS, CRYPT_VERIFYCONTEXT);
+    CryptGenRandom(prov, size, (BYTE*)data);
+    CryptReleaseContext(prov, 0);
 }
 

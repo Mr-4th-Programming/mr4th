@@ -33,6 +33,18 @@ os_base_memory(void){
     return(&memory);
 }
 
+function M_Arena
+os_make_arena_reserve(U64 size){
+    M_Arena result = m_make_arena_reserve(os_base_memory(), size);
+    return(result);
+}
+
+function M_Arena
+os_make_arena(void){
+    M_Arena result = os_make_arena_reserve(M_DEFAULT_RESERVE_SIZE);
+    return(result);
+}
+
 ////////////////////////////////
 // NOTE(allen): Thread Setup
 

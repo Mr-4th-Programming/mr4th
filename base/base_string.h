@@ -119,5 +119,11 @@ function String8      str8_from_str32(M_Arena *arena, String32 string);
 function String16     str16_from_str8(M_Arena *arena, String8 string);
 function String8      str8_from_str16(M_Arena *arena, String16 string);
 
+////////////////////////////////
+// NOTE(allen): Helpers for Serializer/Deserializer Code
+
+function B32 str8_read(String8 data, U64 off, void *dst, U64 size);
+#define str8_read_typed(d,o,p) str8_read((d), (o), p, sizeof(*(p)))
+
 
 #endif //BASE_STRING_H

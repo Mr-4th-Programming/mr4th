@@ -200,6 +200,9 @@ Min(sizeof(*(d)),sizeof(*(s))))
 #define MemoryCopyTyped(d,s,c) MemoryCopy((d),(s),\
 Min(sizeof(*(d)),sizeof(*(s)))*(c))
 
+#define AsciiID4(a,b,c,d) (((d) << 24) | ((c) << 16) | ((b) << 8) | (a))
+#define ExpandAsciiID(x) (int)(sizeof(x)), (char*)(&(x))
+
 ////////////////////////////////
 // NOTE(allen): Linked List Macros
 

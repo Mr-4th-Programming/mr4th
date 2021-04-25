@@ -520,3 +520,16 @@ str8_from_str16(M_Arena *arena, String16 string){
     String8 result = {memory, string_count};
     return(result);
 }
+
+////////////////////////////////
+// NOTE(allen): Helpers for Serializer/Deserializer Code
+
+function B32
+str8_read(String8 data, U64 off, void *dst, U64 size){
+    B32 result = false;
+    if (off + size <= data.size){
+        result = true;
+        MemoryCopy(dst, data.str + off, size);
+    }
+    return(result);
+}

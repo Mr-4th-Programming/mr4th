@@ -12,13 +12,49 @@
 
 #include <stdio.h>
 
+function String8
+f32_buffer_from_s24_buffer(M_Arena *arena, String8 in){
+    Assert((in.size % 3) == 0);
+    
+    String8 result = {};
+    result.size = sizeof(F32)*(in.size/3);
+    result.str = push_array_zero(arena, U8, result.size);
+    
+    U8 *in_ptr = in.str;
+    U8 *opl_ptr = in.str + in.size;
+    U8 *out_ptr = result.str;
+    for (; in_ptr < opl_ptr;
+         in_ptr += 3, out_ptr += 4){
+        // read s24
+        S32 x = 0;
+        MemoryCopy(&x, in_ptr, 3);
+        if ((x & (1 << 23)) != 0){
+            x |= (0xFF << 24);
+        }
+        
+        // divide to float
+        F32 fx = 0.f;
+        if (x >= 0){
+            fx = ((F32)x)/(8388607.f);
+        }
+        else{
+            fx = ((F32)x)/(8388608.f);
+        }
+        
+        // write f32
+        MemoryCopy(out_ptr, &fx, 4);
+    }
+    
+    return(result);
+}
+
 int main(int argc, char **argv){
     OS_ThreadContext tctx_memory = {};
     os_main_init(&tctx_memory, argc, argv);
     
     M_Scratch scratch;
     
-    String8 data = os_file_read(scratch, str8_lit("Binary Main Frame.wav"));
+    String8 data = os_file_read(scratch, str8_lit("wav_test1.wav"));
     
     printf("sizeof 'Binary Main Frame.wav' = %llu\n", data.size);
     
@@ -37,10 +73,10 @@ int main(int argc, char **argv){
     }
     
     // print fmt chunk specifics
-    WAVE_RiffSubChunk_fmt fmt_data = {};
+    WAVE_FormatData fmt_data = {};
     WAVE_SubChunkNode *fmt_node = wave_chunk_from_id(wave_chunks, WAVE_ID_fmt);
     if (fmt_node != 0){
-        fmt_data = wave_fmt_data_from_fmt_chunk(fmt_node, data);
+        fmt_data = wave_format_data_from_fmt_chunk(fmt_node, data);
     }
     
     printf("fmt data:\n");
@@ -50,7 +86,6 @@ int main(int argc, char **argv){
     printf(" bytes_per_second: %-5u\n", fmt_data.bytes_per_second);
     printf(" bytes_per_block:  %-5u\n", fmt_data.bytes_per_block);
     printf(" bits_per_sample:  %-5u\n", fmt_data.bits_per_sample);
-    printf(" extension_size:   %-5u\n", fmt_data.extension_size);
     printf(" valid_bits_per_sample: %u\n", fmt_data.valid_bits_per_sample);
     printf(" channel_mask:     %08x\n", fmt_data.channel_mask);
     printf(" sub_format:       %u-%02x%02x%02x%02x%02x%02x"
@@ -97,21 +132,31 @@ int main(int argc, char **argv){
         U64 block_count = sample_data.size/fmt_data.bytes_per_block;
         
         // unswizzled channels
-        String8 unswizzled_sample_data[2];
-        unswizzle(scratch, sample_data, unswizzled_sample_data,
+        String8 unswizzled_s24[2];
+        unswizzle(scratch, sample_data, unswizzled_s24,
                   stride, fmt_data.channel_count);
         
+        // convert to float
+        String8 unswizzled_f32[2];
+        for (U64 i = 0; i < 2; i += 1){
+            String8 samples = unswizzled_s24[i];
+            unswizzled_f32[i] = f32_buffer_from_s24_buffer(scratch, samples);
+        }
+        
+        
         // setup default params
-        void *channel_memory[2];
+        void *channel_memory[4];
         WAVE_RenderParams wave_render_params = {};
-        wave_render_params.channel_count    = fmt_data.channel_count;
+        wave_render_params.kind = WAVE_RenderKind_Float;
+        wave_render_params.channel_count    = 4;
         wave_render_params.block_count      = block_count;
         wave_render_params.block_per_second = fmt_data.block_per_second;
-        wave_render_params.bits_per_sample  = fmt_data.bits_per_sample;
+        wave_render_params.bits_per_sample  = 32;
         
         wave_render_params.channels = channel_memory;
-        for (U32 i = 0; i < fmt_data.channel_count; i += 1){
-            wave_render_params.channels[i] = unswizzled_sample_data[i].str;
+        for (U32 i = 0; i < 2; i += 1){
+            wave_render_params.channels[i]     = unswizzled_f32[i].str;
+            wave_render_params.channels[i + 2] = unswizzled_f32[i].str;
         }
         
         // render with default params
@@ -136,13 +181,13 @@ int main(int argc, char **argv){
             // TODO(allen): determine the default channel indexing scheme
             // put in helper enum for it or something.
             
-            void *silent_channel = push_array_zero(scratch, U8, unswizzled_sample_data[1].size);
+            void *silent_channel = push_array_zero(scratch, U8, unswizzled_f32[1].size);
             wave_render_params.channels[1] = silent_channel;
             
             String8 rendered_data = wave_render(scratch, &wave_render_params);
             os_file_write(str8_lit("wav_test3.wav"), rendered_data);
             
-            wave_render_params.channels[1] = unswizzled_sample_data[1].str;
+            wave_render_params.channels[1] = unswizzled_f32[1].str;
         }
     }
 }

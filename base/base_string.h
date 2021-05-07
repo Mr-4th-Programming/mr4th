@@ -74,7 +74,8 @@ function String8 str8_prefix(String8 str, U64 size);
 function String8 str8_chop(String8 str, U64 amount);
 function String8 str8_postfix(String8 str, U64 size);
 function String8 str8_skip(String8 str, U64 amount);
-function String8 str8_substr(String8 str, U64 first, U64 opl);
+function String8 str8_substr_opl(String8 str, U64 first, U64 opl);
+function String8 str8_substr_size(String8 str, U64 first, U64 size);
 
 #define str8_expand(s) (int)((s).size), ((s).str)
 

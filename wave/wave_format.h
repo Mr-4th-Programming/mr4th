@@ -3,34 +3,21 @@
 #ifndef WAVE_FORMAT_H
 #define WAVE_FORMAT_H
 
+//requires: riff_format
+
+// definitions:
+//  sample  - one value in a sequence of values forming a signal
+//  channel - one (of several) "parallel" signals
+//            i.e. signals with the same number of samples
+//  block   - a sample for each channel, at a single sequence position
+
 ////////////////////////////////
 // NOTE(allen): Types defined for the "WAV" file format
 
-// NOTE(allen): I am not clear on whether I want to name this
-// "wave_format" and namespace it with "wave" or "riff_format"
-// and namespace it with "riff". It doesn't matter a whole lot
-// but I would certainly like it if my names reflected the
-// correct level of reusability for these definitions. For now
-// I went with "wave" because that implies less reusability,
-// which seems like the right default assumptions.
-// TODO(allen): study the specs more for clarification.
-
 enum{
-    WAVE_ID_RIFF = AsciiID4('R', 'I', 'F', 'F'),
     WAVE_ID_WAVE = AsciiID4('W', 'A', 'V', 'E'),
     WAVE_ID_fmt  = AsciiID4('f', 'm', 't', ' '),
     WAVE_ID_data = AsciiID4('d', 'a', 't', 'a'),
-};
-
-struct WAVE_RiffMasterChunkHeader{
-    U32 riff_id;
-    U32 size;
-    U32 wave_id;
-};
-
-struct WAVE_RiffSubChunkHeader{
-    U32 id;
-    U32 size;
 };
 
 ////////////////////////////////
@@ -45,40 +32,26 @@ enum{
     WAVE_FormatTag_EXTENSIBLE = 0xFFFE,
 };
 
-// definitions:
-//  sample  - one value in a sequence of values forming a signal
-//  channel - one (of several) "parallel" signals
-//            i.e. signals with the same number of samples
-//  block   - a sample for each channel, at a single sequence position
-
-struct WAVE_RiffSubChunk_fmt{
+struct WAVE_ChunkFmt{
     WAVE_FormatTag format_tag;
     U16 channel_count;
-    U32 block_per_second;
+    U32 blocks_per_second;
     U32 bytes_per_second;
     U16 bytes_per_block;
     U16 bits_per_sample;
 };
 
-struct WAVE_RiffSubChunk_fmt_ExtHeader{
+struct WAVE_ChunkFmtExtSize{
     U16 extension_size;
 };
 
 #pragma pack(push, 1)
-struct WAVE_RiffSubChunk_fmt_Ext{
+struct WAVE_ChunkFmtExt1{
     U16 valid_bits_per_sample;
     U32 channel_mask;
     U8  sub_format[16];
 };
 #pragma pack(pop)
-
-// NOTE(allen): According to the reference (need to test)
-//  In PCM bits_per_sample may be a non-multiple of 8
-//   to indicate that less than all of the bits are significant.
-//   Still stride by a multiple of 8 bits.
-//  In Non-PCM bits_per_sample must be a multiple of 8,
-//   and valid_bits_per_sample (if included) can be used to
-//   indicate the number of significant bits.
 
 ////////////////////////////////
 // NOTE(allen): Speaker Spatial Flags

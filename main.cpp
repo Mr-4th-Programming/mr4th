@@ -1,6 +1,7 @@
 #include "base/base_inc.h"
 #include "os/os_inc.h"
 
+#include "wave/riff_format.h"
 #include "wave/wave_format.h"
 #include "wave/wave_parser.h"
 
@@ -54,7 +55,7 @@ int main(int argc, char **argv){
     
     M_Scratch scratch;
     
-    String8 data = os_file_read(scratch, str8_lit("wav_test1.wav"));
+    String8 data = os_file_read(scratch, str8_lit("Binary Main Frame.wav"));
     
     printf("sizeof 'Binary Main Frame.wav' = %llu\n", data.size);
     
@@ -80,15 +81,15 @@ int main(int argc, char **argv){
     }
     
     printf("fmt data:\n");
-    printf(" format_tag:       %-5u\n", fmt_data.format_tag);
-    printf(" channel_count:    %-5u\n", fmt_data.channel_count);
-    printf(" block_per_second: %-5u\n", fmt_data.block_per_second);
-    printf(" bytes_per_second: %-5u\n", fmt_data.bytes_per_second);
-    printf(" bytes_per_block:  %-5u\n", fmt_data.bytes_per_block);
-    printf(" bits_per_sample:  %-5u\n", fmt_data.bits_per_sample);
-    printf(" valid_bits_per_sample: %u\n", fmt_data.valid_bits_per_sample);
-    printf(" channel_mask:     %08x\n", fmt_data.channel_mask);
-    printf(" sub_format:       %u-%02x%02x%02x%02x%02x%02x"
+    printf(" format_tag:        %-5u\n", fmt_data.format_tag);
+    printf(" channel_count:     %-5u\n", fmt_data.channel_count);
+    printf(" blocks_per_second: %-5u\n", fmt_data.blocks_per_second);
+    //printf(" bytes_per_second:  %-5u\n", fmt_data.bytes_per_second);
+    printf(" bytes_per_block:   %-5u\n", fmt_data.bytes_per_block);
+    printf(" bytes_stride_per_sample: %u\n", fmt_data.bytes_stride_per_sample);
+    printf(" bits_per_sample:   %-5u\n", fmt_data.bits_per_sample);
+    printf(" channel_mask:      %08x\n", fmt_data.channel_mask);
+    printf(" sub_format:        %u-%02x%02x%02x%02x%02x%02x"
            "%02x%02x%02x%02x%02x%02x%02x%02x\n",
            *(U16*)fmt_data.sub_format,
            fmt_data.sub_format[2], fmt_data.sub_format[3],
@@ -103,13 +104,7 @@ int main(int argc, char **argv){
     String8 sample_data = {};
     WAVE_SubChunkNode *data_node = wave_chunk_from_id(wave_chunks, WAVE_ID_data);
     if (data_node != 0){
-        U64 first = data_node->off;
-        U64 opl = data_node->off + data_node->size;
-        
-        U64 first_clamped = ClampTop(first, data.size);
-        U64 opl_clamped   = ClampTop(opl, data.size);
-        
-        sample_data = str8_substr(data, first_clamped, opl_clamped);
+        sample_data = str8_substr_size(data, data_node->off, data_node->size);
     }
     
     printf("sample data:\n");
@@ -132,9 +127,9 @@ int main(int argc, char **argv){
         U64 block_count = sample_data.size/fmt_data.bytes_per_block;
         
         // unswizzled channels
-        String8 unswizzled_s24[2];
-        unswizzle(scratch, sample_data, unswizzled_s24,
-                  stride, fmt_data.channel_count);
+        String8 *unswizzled_s24 =
+            bop_uninterleave(scratch, sample_data.str, fmt_data.channel_count,
+                             stride, block_count);
         
         // convert to float
         String8 unswizzled_f32[2];
@@ -148,9 +143,9 @@ int main(int argc, char **argv){
         void *channel_memory[4];
         WAVE_RenderParams wave_render_params = {};
         wave_render_params.kind = WAVE_RenderKind_Float;
-        wave_render_params.channel_count    = 4;
+        wave_render_params.channel_count    = 2;
         wave_render_params.block_count      = block_count;
-        wave_render_params.block_per_second = fmt_data.block_per_second;
+        wave_render_params.block_per_second = fmt_data.blocks_per_second;
         wave_render_params.bits_per_sample  = 32;
         
         wave_render_params.channels = channel_memory;

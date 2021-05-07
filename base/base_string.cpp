@@ -77,10 +77,16 @@ str8_skip(String8 str, U64 amount){
 }
 
 function String8
-str8_substr(String8 str, U64 first, U64 opl){
+str8_substr_opl(String8 str, U64 first, U64 opl){
     U64 opl_clamped = ClampTop(opl, str.size);
     U64 first_clamped = ClampTop(first, opl_clamped);
     String8 result = {str.str + first_clamped, opl_clamped - first_clamped};
+    return(result);
+}
+
+function String8
+str8_substr_size(String8 str, U64 first, U64 size){
+    String8 result = str8_substr_opl(str, first, first + size);
     return(result);
 }
 

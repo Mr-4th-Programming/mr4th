@@ -22,7 +22,6 @@ struct WAVE_SubChunkList{
     U64 count;
 };
 
-// TODO(allen): compare this with RenderParams - they seem related.
 struct WAVE_FormatData{
     WAVE_FormatTag format_tag;
     U32 channel_count;
@@ -37,18 +36,23 @@ struct WAVE_FormatData{
 ////////////////////////////////
 // NOTE(allen): Wave Render Types
 
-enum WAVE_RenderKind{
-    WAVE_RenderKind_Signed,
-    WAVE_RenderKind_Float,
+typedef U32 WAVE_RenderKind;
+enum{
+    // [0,0xFFFF] reserved for signed types
+    // with bit_size(WAVE_RenderKind_Signed0 + n) = n
+    WAVE_RenderKind_Signed0  = (0x0 << 16),
+    
+    // [0x10000,0x1FFFF] reserved for float types
+    // with bit_size(WAVE_RenderKind_Float<n>) = n
+    WAVE_RenderKind_Float16 = (0x1 << 16),
+    WAVE_RenderKind_Float32,
+    WAVE_RenderKind_Float64,
 };
 
 struct WAVE_RenderParams{
     WAVE_RenderKind kind;
     U32 channel_count;
-    U32 block_count;
     U16 block_per_second;
-    U16 bits_per_sample;
-    void **channels;
 };
 
 ////////////////////////////////
@@ -66,6 +70,7 @@ wave_format_data_from_fmt_chunk(WAVE_SubChunkNode *node, String8 data);
 ////////////////////////////////
 // NOTE(allen): Wave Render Functions
 
-function String8 wave_render(M_Arena *arena, WAVE_RenderParams *params);
+function String8 wave_render(M_Arena *arena, WAVE_RenderParams *params,
+                             String8 sample_data);
 
 #endif //WAVE_PARSER_H

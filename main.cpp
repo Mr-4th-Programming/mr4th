@@ -13,42 +13,6 @@
 
 #include <stdio.h>
 
-function String8
-f32_buffer_from_s24_buffer(M_Arena *arena, String8 in){
-    Assert((in.size % 3) == 0);
-    
-    String8 result = {};
-    result.size = sizeof(F32)*(in.size/3);
-    result.str = push_array_zero(arena, U8, result.size);
-    
-    U8 *in_ptr = in.str;
-    U8 *opl_ptr = in.str + in.size;
-    U8 *out_ptr = result.str;
-    for (; in_ptr < opl_ptr;
-         in_ptr += 3, out_ptr += 4){
-        // read s24
-        S32 x = 0;
-        MemoryCopy(&x, in_ptr, 3);
-        if ((x & (1 << 23)) != 0){
-            x |= (0xFF << 24);
-        }
-        
-        // divide to float
-        F32 fx = 0.f;
-        if (x >= 0){
-            fx = ((F32)x)/(8388607.f);
-        }
-        else{
-            fx = ((F32)x)/(8388608.f);
-        }
-        
-        // write f32
-        MemoryCopy(out_ptr, &fx, 4);
-    }
-    
-    return(result);
-}
-
 int main(int argc, char **argv){
     OS_ThreadContext tctx_memory = {};
     os_main_init(&tctx_memory, argc, argv);
@@ -135,54 +99,47 @@ int main(int argc, char **argv){
         String8 unswizzled_f32[2];
         for (U64 i = 0; i < 2; i += 1){
             String8 samples = unswizzled_s24[i];
-            unswizzled_f32[i] = f32_buffer_from_s24_buffer(scratch, samples);
+            unswizzled_f32[i] = bop_f32_from_s24(scratch, samples);
         }
         
         
         // setup default params
-        void *channel_memory[4];
         WAVE_RenderParams wave_render_params = {};
-        wave_render_params.kind = WAVE_RenderKind_Float;
+        wave_render_params.kind = WAVE_RenderKind_Float32;
         wave_render_params.channel_count    = 2;
-        wave_render_params.block_count      = block_count;
         wave_render_params.block_per_second = fmt_data.blocks_per_second;
-        wave_render_params.bits_per_sample  = 32;
         
-        wave_render_params.channels = channel_memory;
+        void *channels[4];
         for (U32 i = 0; i < 2; i += 1){
-            wave_render_params.channels[i]     = unswizzled_f32[i].str;
-            wave_render_params.channels[i + 2] = unswizzled_f32[i].str;
+            channels[i]     = unswizzled_f32[i].str;
+            channels[i + 2] = unswizzled_f32[i].str;
         }
         
         // render with default params
         {
-            String8 rendered_data = wave_render(scratch, &wave_render_params);
+            String8 swizzled = bop_interleave(scratch, channels, 2, 4, block_count);
+            String8 rendered_data = wave_render(scratch, &wave_render_params, swizzled);
             os_file_write(str8_lit("wav_test1.wav"), rendered_data);
         }
         
         // render wtih truncated time
         {
-            U32 restore = wave_render_params.block_count;
-            wave_render_params.block_count = wave_render_params.block_per_second;
-            
-            String8 rendered_data = wave_render(scratch, &wave_render_params);
+            String8 swizzled = bop_interleave(scratch, channels, 2, 4,
+                                              wave_render_params.block_per_second);
+            String8 rendered_data = wave_render(scratch, &wave_render_params, swizzled);
             os_file_write(str8_lit("wav_test2.wav"), rendered_data);
-            
-            wave_render_params.block_count = restore;
         }
         
         // render with silent right channel
         {
-            // TODO(allen): determine the default channel indexing scheme
-            // put in helper enum for it or something.
-            
             void *silent_channel = push_array_zero(scratch, U8, unswizzled_f32[1].size);
-            wave_render_params.channels[1] = silent_channel;
+            channels[1] = silent_channel;
             
-            String8 rendered_data = wave_render(scratch, &wave_render_params);
+            String8 swizzled = bop_interleave(scratch, channels, 2, 4, block_count);
+            String8 rendered_data = wave_render(scratch, &wave_render_params, swizzled);
             os_file_write(str8_lit("wav_test3.wav"), rendered_data);
             
-            wave_render_params.channels[1] = unswizzled_f32[1].str;
+            channels[1] = unswizzled_f32[1].str;
         }
     }
 }

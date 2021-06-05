@@ -21,6 +21,31 @@ enum{
 };
 
 ////////////////////////////////
+// NOTE(allen): Speaker Spatial Flags
+
+typedef U32 WAVE_SpeakerFlags;
+enum{
+    WAVE_SpeakerFlag_FRONT_LEFT            = (1 << 0),
+    WAVE_SpeakerFlag_FRONT_RIGHT           = (1 << 1),
+    WAVE_SpeakerFlag_FRONT_CENTER          = (1 << 2),
+    WAVE_SpeakerFlag_LOW_FREQUENCY         = (1 << 3),
+    WAVE_SpeakerFlag_BACK_LEFT             = (1 << 4),
+    WAVE_SpeakerFlag_BACK_RIGHT            = (1 << 5),
+    WAVE_SpeakerFlag_FRONT_LEFT_OF_CENTER  = (1 << 6),
+    WAVE_SpeakerFlag_FRONT_RIGHT_OF_CENTER = (1 << 7),
+    WAVE_SpeakerFlag_BACK_CENTER           = (1 << 8),
+    WAVE_SpeakerFlag_SIDE_LEFT             = (1 << 9),
+    WAVE_SpeakerFlag_SIDE_RIGHT            = (1 << 10),
+    WAVE_SpeakerFlag_TOP_CENTER            = (1 << 11),
+    WAVE_SpeakerFlag_TOP_FRONT_LEFT        = (1 << 12),
+    WAVE_SpeakerFlag_TOP_FRONT_CENTER      = (1 << 13),
+    WAVE_SpeakerFlag_TOP_FRONT_RIGHT       = (1 << 14),
+    WAVE_SpeakerFlag_TOP_BACK_LEFT         = (1 << 15),
+    WAVE_SpeakerFlag_TOP_BACK_CENTER       = (1 << 16),
+    WAVE_SpeakerFlag_TOP_BACK_RIGHT        = (1 << 17),
+};
+
+////////////////////////////////
 // NOTE(allen): "fmt " Sub Chunk
 
 typedef U16 WAVE_FormatTag;
@@ -48,34 +73,9 @@ struct WAVE_ChunkFmtExtSize{
 #pragma pack(push, 1)
 struct WAVE_ChunkFmtExt1{
     U16 valid_bits_per_sample;
-    U32 channel_mask;
+    WAVE_SpeakerFlags channel_mask;
     U8  sub_format[16];
 };
 #pragma pack(pop)
-
-////////////////////////////////
-// NOTE(allen): Speaker Spatial Flags
-
-typedef U32 WAVE_SpeakerFlags;
-enum{
-    WAVE_SpeakerFlag_FRONT_LEFT            = (1 << 0),
-    WAVE_SpeakerFlag_FRONT_RIGHT           = (1 << 1),
-    WAVE_SpeakerFlag_FRONT_CENTER          = (1 << 2),
-    WAVE_SpeakerFlag_LOW_FREQUENCY         = (1 << 3),
-    WAVE_SpeakerFlag_BACK_LEFT             = (1 << 4),
-    WAVE_SpeakerFlag_BACK_RIGHT            = (1 << 5),
-    WAVE_SpeakerFlag_FRONT_LEFT_OF_CENTER  = (1 << 6),
-    WAVE_SpeakerFlag_FRONT_RIGHT_OF_CENTER = (1 << 7),
-    WAVE_SpeakerFlag_BACK_CENTER           = (1 << 8),
-    WAVE_SpeakerFlag_SIDE_LEFT             = (1 << 9),
-    WAVE_SpeakerFlag_SIDE_RIGHT            = (1 << 10),
-    WAVE_SpeakerFlag_TOP_CENTER            = (1 << 11),
-    WAVE_SpeakerFlag_TOP_FRONT_LEFT        = (1 << 12),
-    WAVE_SpeakerFlag_TOP_FRONT_CENTER      = (1 << 13),
-    WAVE_SpeakerFlag_TOP_FRONT_RIGHT       = (1 << 14),
-    WAVE_SpeakerFlag_TOP_BACK_LEFT         = (1 << 15),
-    WAVE_SpeakerFlag_TOP_BACK_CENTER       = (1 << 16),
-    WAVE_SpeakerFlag_TOP_BACK_RIGHT        = (1 << 17),
-};
 
 #endif //WAVE_FORMAT_H

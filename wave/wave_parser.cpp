@@ -120,131 +120,136 @@ wave_format_data_from_fmt_chunk(WAVE_SubChunkNode *node, String8 data){
 // NOTE(allen): Wave Render Functions
 
 function String8
-wave_render(M_Arena *arena, WAVE_RenderParams *params){
-    // TODO(allen): incorporate
-    // NOTE(allen): According to the reference (need to test)
-    //  In PCM bits_per_sample may be a non-multiple of 8
-    //   to indicate that less than all of the bits are significant.
-    //   Still stride by a multiple of 8 bits.
-    //  In Non-PCM bits_per_sample must be a multiple of 8,
-    //   and valid_bits_per_sample (if included) can be used to
-    //   indicate the number of significant bits.
-    
-    // compute additional rates from params
-    U32 bits_per_sample_rounded = AlignUpPow2(params->bits_per_sample, 8);
-    U32 bytes_per_sample = bits_per_sample_rounded >> 3;
-    U32 bytes_per_block  = bytes_per_sample*params->channel_count;
-    U32 bytes_per_second = bytes_per_block*params->block_per_second;
-    
-    M_Scratch scratch(arena);
-    String8List list = {};
-    
-    // master header
-    RIFF_MasterChunkHeader *master = push_array(scratch, RIFF_MasterChunkHeader, 1);
-    str8_list_push(scratch, &list, str8_typed(master));
-    master->riff_id = RIFF_ID_RIFF;
-    master->sub_id = WAVE_ID_WAVE;
-    
-    // fmt chunk
-    {
-        RIFF_SubChunkHeader *fmt_header = push_array(scratch, RIFF_SubChunkHeader, 1);
-        str8_list_push(scratch, &list, str8_typed(fmt_header));
-        fmt_header->id = WAVE_ID_fmt;
-        
-        // save position of fmt chunk
-        U64 fmt_chunk_off = list.total_size;
-        
-        // determine format tag
-        WAVE_FormatTag tag = 0;
+wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
+    // interpret the wav render kind
+    WAVE_FormatTag tag = 0;
+    U32 valid_bits_per_sample = 0;
+    if (params->kind <= 0xFFFF){
+        valid_bits_per_sample = params->kind;
+        tag = WAVE_FormatTag_PCM;
+    }
+    else{
         switch (params->kind){
-            case WAVE_RenderKind_Signed:
+            case WAVE_RenderKind_Float16:
             {
-                tag = WAVE_FormatTag_PCM;
+                valid_bits_per_sample = 16; tag = WAVE_FormatTag_IEEE_FLOAT;
             }break;
-            
-            case WAVE_RenderKind_Float:
+            case WAVE_RenderKind_Float32:
             {
-                tag = WAVE_FormatTag_IEEE_FLOAT;
+                valid_bits_per_sample = 32; tag = WAVE_FormatTag_IEEE_FLOAT;
+            }break;
+            case WAVE_RenderKind_Float64:
+            {
+                valid_bits_per_sample = 64; tag = WAVE_FormatTag_IEEE_FLOAT;
             }break;
         }
+    }
+    B32 good_kind = (0 < valid_bits_per_sample && valid_bits_per_sample <= 64);
+    
+    // proceed with serialization if validated
+    String8 result = {};
+    if (good_kind){
         
-        // TODO(allen): this could be weird, we are pushing
-        // the full sized fmt struct, but we're not actually
-        // using the extension at all. Perhaps we need to the
-        // fmt struct into smaller parts.
-        
-        // fill fmt data
-        WAVE_ChunkFmt *fmt_data = push_array_zero(scratch, WAVE_ChunkFmt, 1);
-        str8_list_push(scratch, &list, str8_typed(fmt_data));
-        
-        fmt_data->format_tag = tag;
-        fmt_data->channel_count = params->channel_count;
-        fmt_data->blocks_per_second = params->block_per_second;
-        fmt_data->bytes_per_second = bytes_per_second;
-        fmt_data->bits_per_sample  = params->bits_per_sample;
+        // compute additional rates from params
+        U32 channel_count = params->channel_count;
+        U32 bits_per_sample_rounded = AlignUpPow2(valid_bits_per_sample, 8);
+        U32 bytes_per_sample = bits_per_sample_rounded >> 3;
+        U32 bytes_per_block  = bytes_per_sample*channel_count;
+        U32 bytes_per_second = bytes_per_block*params->block_per_second;
         
         // determine if extension is required
         B32 required_extension = false;
-        if (params->channel_count > 2){
+        if (channel_count > 2 || tag != WAVE_FormatTag_PCM){
             required_extension = true;
         }
         
+        // determine how to report bits_per_sample
+        U32 report_bits_per_sample = valid_bits_per_sample;
         if (required_extension){
-            // fill fmt ext header data
-            WAVE_ChunkFmtExtSize *fmt_extheader = push_array_zero(scratch, WAVE_ChunkFmtExtSize, 1);
-            str8_list_push(scratch, &list, str8_typed(fmt_extheader));
-            fmt_extheader->extension_size = sizeof(WAVE_ChunkFmtExt1);
-            
-            // determine channel mask (dummy path)
-            WAVE_SpeakerFlags channel_mask = 0;
-            if (params->channel_count > 0){
-                channel_mask |= WAVE_SpeakerFlag_FRONT_LEFT;
-            }
-            if (params->channel_count > 1){
-                channel_mask |= WAVE_SpeakerFlag_FRONT_RIGHT;
-            }
-            if (params->channel_count > 2){
-                channel_mask |= WAVE_SpeakerFlag_BACK_LEFT;
-            }
-            if (params->channel_count > 3){
-                channel_mask |= WAVE_SpeakerFlag_BACK_RIGHT;
-            }
-            
-            // fill fmt ext data
-            WAVE_ChunkFmtExt1 *fmt_ext = push_array_zero(scratch, WAVE_ChunkFmtExt1, 1);
-            str8_list_push(scratch, &list, str8_typed(fmt_ext));
-            fmt_ext->valid_bits_per_sample = params->bits_per_sample;
-            fmt_ext->channel_mask = channel_mask;
-            // TODO(allen): ??? fmt_ext->sub_format
+            report_bits_per_sample = bits_per_sample_rounded;
         }
         
-        // fill fmt header size
-        fmt_header->size = list.total_size - fmt_chunk_off;
+        // auto-mask
+        U32 auto_mask = max_U32;
+        if (required_extension){
+            if (channel_count < 32){
+                auto_mask = (1 << channel_count) - 1;
+            }
+        }
+        
+        // setup serialization
+        M_Scratch scratch(arena);
+        String8List list = {};
+        
+        // master header
+        RIFF_MasterChunkHeader *master = push_array(scratch, RIFF_MasterChunkHeader, 1);
+        str8_list_push(scratch, &list, str8_typed(master));
+        master->riff_id = RIFF_ID_RIFF;
+        master->sub_id = WAVE_ID_WAVE;
+        
+        // fmt chunk
+        {
+            RIFF_SubChunkHeader *fmt_header = push_array(scratch, RIFF_SubChunkHeader, 1);
+            str8_list_push(scratch, &list, str8_typed(fmt_header));
+            fmt_header->id = WAVE_ID_fmt;
+            
+            // save position of fmt chunk
+            U64 fmt_chunk_off = list.total_size;
+            
+            // fill fmt data
+            WAVE_ChunkFmt *fmt_data = push_array_zero(scratch, WAVE_ChunkFmt, 1);
+            str8_list_push(scratch, &list, str8_typed(fmt_data));
+            
+            fmt_data->format_tag = tag;
+            fmt_data->channel_count = channel_count;
+            fmt_data->blocks_per_second = params->block_per_second;
+            fmt_data->bytes_per_second = bytes_per_second;
+            fmt_data->bits_per_sample  = report_bits_per_sample;
+            
+            if (required_extension){
+                // fill fmt ext header data
+                WAVE_ChunkFmtExtSize *fmt_extheader = push_array_zero(scratch, WAVE_ChunkFmtExtSize, 1);
+                str8_list_push(scratch, &list, str8_typed(fmt_extheader));
+                fmt_extheader->extension_size = sizeof(WAVE_ChunkFmtExt1);
+                
+                // fill fmt ext data
+                WAVE_ChunkFmtExt1 *fmt_ext = push_array_zero(scratch, WAVE_ChunkFmtExt1, 1);
+                str8_list_push(scratch, &list, str8_typed(fmt_ext));
+                fmt_ext->valid_bits_per_sample = valid_bits_per_sample;
+                fmt_ext->channel_mask = auto_mask;
+                MemoryCopy(fmt_ext->sub_format, &tag, 2);
+                MemoryCopy(fmt_ext->sub_format + 2,
+                           "\x00\x00\x00\x00\x10\x00\x80\x00\x00\xAA\x00\x38\x9B\x71",
+                           14);
+            }
+            
+            // fill fmt header size
+            fmt_header->size = list.total_size - fmt_chunk_off;
+        }
+        
+        // data chunk
+        {
+            RIFF_SubChunkHeader *data_header = push_array(scratch, RIFF_SubChunkHeader, 1);
+            str8_list_push(scratch, &list, str8_typed(data_header));
+            data_header->id = WAVE_ID_data;
+            
+            // save position of data chunk
+            U64 data_chunk_off = list.total_size;
+            
+            // push the sample data
+            str8_list_push(scratch, &list, sample_data);
+            
+            // fill data header size
+            data_header->size = list.total_size - data_chunk_off;
+        }
+        
+        // fill master size
+        master->size = list.total_size - 8;
+        
+        // combine output
+        result = str8_join(arena, &list, 0);
     }
     
-    // data chunk
-    {
-        RIFF_SubChunkHeader *data_header = push_array(scratch, RIFF_SubChunkHeader, 1);
-        str8_list_push(scratch, &list, str8_typed(data_header));
-        data_header->id = WAVE_ID_data;
-        
-        // save position of data chunk
-        U64 data_chunk_off = list.total_size;
-        
-        // swizzle the channels together
-        String8 swizzled_data =
-            bop_interleave(scratch, params->channels, params->channel_count,
-                           bytes_per_sample, params->block_count);
-        str8_list_push(scratch, &list, swizzled_data);
-        
-        // fill data header size
-        data_header->size = list.total_size - data_chunk_off;
-    }
-    
-    // fill master size
-    master->size = list.total_size - 8;
-    
-    String8 result = str8_join(arena, &list, 0);
     return(result);
 }
 

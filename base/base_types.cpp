@@ -216,6 +216,22 @@ abs_F64(F64 x){
     return(r.f);
 }
 
+function F32
+sign_F32(F32 x){
+    union{ F32 f; U32 u; } r;
+    r.f = x;
+    F32 result = (r.u&0x80000000)?-1.f:1.f;
+    return(result);
+}
+
+function F64
+sign_F64(F64 x){
+    union{ F64 f; U32 u; } r;
+    r.f = x;
+    F64 result = (r.u&0x8000000000000000)?-1.:1.;
+    return(result);
+}
+
 #include <math.h>
 
 function F32
@@ -239,8 +255,18 @@ tan_F32(F32 x){
 }
 
 function F32
+atan_F32(F32 x){
+    return(atanf(x));
+}
+
+function F32
 ln_F32(F32 x){
     return(logf(x));
+}
+
+function F32
+pow_F32(F32 base, F32 x){
+    return(powf(base, x));
 }
 
 function F64
@@ -264,8 +290,18 @@ tan_F64(F64 x){
 }
 
 function F64
+atan_F64(F64 x){
+    return(atanf(x));
+}
+
+function F64
 ln_F64(F64 x){
     return(log(x));
+}
+
+function F64
+pow_F64(F64 base, F64 x){
+    return(powf(base, x));
 }
 
 function F32
@@ -281,6 +317,37 @@ unlerp(F32 a, F32 x, F32 b){
         t = (x - a)/(b - a);
     }
     return(t);
+}
+
+function F32
+trunc_F32(F32 x){
+    // TODO(allen): does this always work?
+    //              can we do better?
+    return((F32)(S32)x);
+}
+
+function F32
+floor_F32(F32 x){
+    F32 r;
+    if (x >= 0.f){
+        r = (F32)(S32)x;
+    }
+    else{
+        r = (F32)(((S32)x) - 1);
+    }
+    return(r);
+}
+
+function F32
+ceil_F32(F32 x){
+    F32 r;
+    if (x >= 0.f){
+        r = (F32)(((S32)x) + 1);
+    }
+    else{
+        r = (F32)(S32)x;
+    }
+    return(r);
 }
 
 ////////////////////////////////

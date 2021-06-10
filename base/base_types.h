@@ -520,21 +520,31 @@ function F64 neg_inf_F64(void);
 
 function F32 abs_F32(F32 x);
 function F64 abs_F64(F64 x);
+function F32 sign_F32(F32 x);
+function F64 sign_F64(F64 x);
 
 function F32 sqrt_F32(F32 x);
 function F32 sin_F32(F32 x);
 function F32 cos_F32(F32 x);
 function F32 tan_F32(F32 x);
+function F32 atan_F32(F32 x);
 function F32 ln_F32(F32 x);
+function F32 pow_F32(F32 base, F32 x);
 
 function F64 sqrt_F64(F64 x);
 function F64 sin_F64(F64 x);
 function F64 cos_F64(F64 x);
 function F64 tan_F64(F64 x);
+function F64 atan_F64(F64 x);
 function F64 ln_F64(F64 x);
+function F64 pow_F64(F64 base, F64 x);
 
 function F32 lerp(F32 a, F32 t, F32 b);
 function F32 unlerp(F32 a, F32 x, F32 b);
+
+function F32 trunc_F32(F32 x);
+function F32 floor_F32(F32 x);
+function F32 ceil_F32(F32 x);
 
 ////////////////////////////////
 // NOTE(allen): Compound Type Functions

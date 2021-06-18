@@ -542,6 +542,8 @@ function F64 pow_F64(F64 base, F64 x);
 function F32 lerp(F32 a, F32 t, F32 b);
 function F32 unlerp(F32 a, F32 x, F32 b);
 
+function F32 lerp_range(I1F32 range, F32 t);
+
 function F32 trunc_F32(F32 x);
 function F32 floor_F32(F32 x);
 function F32 ceil_F32(F32 x);

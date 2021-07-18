@@ -16,5 +16,7 @@ function String8* bop_uninterleave(M_Arena *arena, void *in,
 // NOTE(allen): Conversions
 
 function String8 bop_f32_from_s24(M_Arena *arena, String8 in);
+function String8 bop_s24_from_f32(M_Arena *arena, String8 in);
+function String8 bop_s16_from_f32(M_Arena *arena, String8 in);
 
 #endif //BASE_BUFFER_OPS_H

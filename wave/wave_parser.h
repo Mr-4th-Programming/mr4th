@@ -73,4 +73,9 @@ wave_format_data_from_fmt_chunk(WAVE_SubChunkNode *node, String8 data);
 function String8 wave_render(M_Arena *arena, WAVE_RenderParams *params,
                              String8 sample_data);
 
+////////////////////////////////
+// NOTE(allen): Wave Debug Functions
+
+function void wave_dump(M_Arena *arena, String8List *out, String8 data);
+
 #endif //WAVE_PARSER_H

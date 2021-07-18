@@ -103,3 +103,84 @@ bop_f32_from_s24(M_Arena *arena, String8 in){
     result.size = el_count*sizeof(F32);
     return(result);
 }
+
+function String8
+bop_s24_from_f32(M_Arena *arena, String8 in){
+    // TODO(allen): look at disassembly for real speed work
+    
+    // round size
+    U64 el_count = in.size/4;
+    
+    // allocate out
+    U8 *out = push_array(arena, U8, el_count*3);
+    
+    // fill loop
+    F32 *in_ptr = (F32*)in.str;
+    U8 *out_ptr = out;
+    U8 *opl_ptr = out_ptr + el_count*3;
+    for (; out_ptr < opl_ptr; out_ptr += 3, in_ptr += 1){
+        // read f32
+        F32 x = (*in_ptr);
+        F32 x_clamped = Clamp(-1.f, x, 1.f);
+        
+        // multiply to s24 (inside a s32)
+        S32 fx = 0;
+        if (x >= 0){
+            fx = 0x7FFFFF*x_clamped;
+        }
+        else{
+            fx = 0x800000*x_clamped;
+        }
+        
+        // write s24
+        out_ptr[0] = fx&0xFF;
+        out_ptr[1] = (fx >> 8)&0xFF;
+        out_ptr[2] = (fx >> 16)&0xFF;
+    }
+    
+    // package output buffer
+    String8 result = {};
+    result.str = (U8*)out;
+    result.size = el_count*3;
+    return(result);
+}
+
+function String8
+bop_s16_from_f32(M_Arena *arena, String8 in){
+    // TODO(allen): look at disassembly for real speed work
+    
+    // round size
+    U64 el_count = in.size/4;
+    
+    // allocate out
+    S16 *out = push_array(arena, S16, el_count);
+    
+    // fill loop
+    F32 *in_ptr = (F32*)in.str;
+    S16 *out_ptr = out;
+    S16 *opl_ptr = out_ptr + el_count;
+    for (; out_ptr < opl_ptr; out_ptr += 1, in_ptr += 1){
+        // read f32
+        F32 x = (*in_ptr);
+        F32 x_clamped = Clamp(-1.f, x, 1.f);
+        
+        // multiply to s16 (inside a s32)
+        S32 fx = 0;
+        if (x >= 0){
+            fx = 0x7FFF*x_clamped;
+        }
+        else{
+            fx = 0x8000*x_clamped;
+        }
+        
+        // write s16
+        *out_ptr = fx;
+    }
+    
+    // package output buffer
+    String8 result = {};
+    result.str = (U8*)out;
+    result.size = el_count*sizeof(S16);
+    return(result);
+}
+

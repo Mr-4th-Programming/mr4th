@@ -663,6 +663,18 @@ intr_axis(I2F32 r, Axis axis){
     return(result);
 }
 
+function I1F32
+intr_clamp_top(I1F32 r, F32 top){
+    I1F32 result = { ClampTop(r.min, top), ClampTop(r.max, top) };
+    return(r);
+}
+
+function I1U64
+intr_clamp_top(I1U64 r, U64 top){
+    I1U64 result = { ClampTop(r.min, top), ClampTop(r.max, top) };
+    return(r);
+}
+
 ////////////////////////////////
 // NOTE(allen): Time Functions
 

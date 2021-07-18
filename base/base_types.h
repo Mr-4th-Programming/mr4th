@@ -613,6 +613,9 @@ function V2F32 intr_center(I2F32 r);
 
 function I1F32 intr_axis(I2F32 r, Axis axis);
 
+function I1F32 intr_clamp_top(I1F32 r, F32 top);
+function I1U64 intr_clamp_top(I1U64 r, U64 top);
+
 ////////////////////////////////
 // NOTE(allen): Time Functions
 

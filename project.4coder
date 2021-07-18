@@ -30,8 +30,19 @@ commands = {
    .win = "pushd build & test a b foo bar -- \"a b c d\"",
    .linux = "build/test",
    .mac = "build/test", },
+
+ .build_play_temp_wave = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .win = "build_play_temp_wave.bat",
+   .linux = "./build_play_temp_wave.sh",
+   .mac = "./build_play_temp_wave.sh", },
+ .run_play_temp_wave = { .out = "*run*", .footer_panel = false, .save_dirty_files = false,
+   .win = "pushd build & play_temp_wave",
+   .linux = "build/play_temp_wave",
+   .mac = "build/play_temp_wave", },
 };
+
 fkey_command = {
  .F1 = "build",
  .F2 = "run",
+ .F5 = "run_play_temp_wave",
 };

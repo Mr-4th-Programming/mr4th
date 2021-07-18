@@ -204,6 +204,7 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
             fmt_data->channel_count = channel_count;
             fmt_data->blocks_per_second = params->block_per_second;
             fmt_data->bytes_per_second = bytes_per_second;
+            fmt_data->bytes_per_block  = bytes_per_second/params->block_per_second;
             fmt_data->bits_per_sample  = report_bits_per_sample;
             
             if (required_extension){
@@ -253,3 +254,40 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
     return(result);
 }
 
+////////////////////////////////
+// NOTE(allen): Wave Debug Functions
+
+function void
+wave_dump(M_Arena *arena, String8List *out, String8 data){
+    M_Scratch scratch(arena);
+    WAVE_SubChunkList chunks = wave_sub_chunks_from_data(scratch, data);
+    for (WAVE_SubChunkNode *node = chunks.first;
+         node != 0;
+         node = node->next){
+        str8_list_pushf(arena, out, "chunk: %.4s; size=%u; off=0x%08llx\n",
+                        (char*)&node->id, node->size, node->off);
+        switch (node->id){
+            case WAVE_ID_fmt:
+            {
+                WAVE_FormatData fmt_data = wave_format_data_from_fmt_chunk(node, data);
+                str8_list_pushf(arena, out,
+                                " tag:              %u\n"
+                                " channel_count:    %u\n"
+                                " bytes_per_block:  %u\n"
+                                " bytes_per_second: %u\n"
+                                " bytes_stride_per_sample: %u\n"
+                                " bits_per_sample:  %u\n"
+                                " channel_mask:     %04x\n"
+                                " sub_format:       %.16s\n",
+                                fmt_data.format_tag,
+                                fmt_data.channel_count,
+                                fmt_data.bytes_per_block,
+                                fmt_data.blocks_per_second,
+                                fmt_data.bytes_stride_per_sample,
+                                fmt_data.bits_per_sample,
+                                fmt_data.channel_mask,
+                                fmt_data.sub_format);
+            }break;
+        }
+    }
+}

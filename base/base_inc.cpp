@@ -5,3 +5,4 @@
 #include "base_memory.cpp"
 #include "base_string.cpp"
 #include "base_buffer_ops.cpp"
+#include "base_prng.cpp"

@@ -59,7 +59,60 @@ audgen_compress_lin(F32 *buf, U64 sample_count, F32 mix_count){
 }
 
 ////////////////////////////////
+// NOTE(allen): Audio Generation Filters
+
+function void
+audgen_low_pass_in_place(AUDGEN_Buffer buf, I1F32 range_t, F32 cutoff_freq){
+    F32 dt = buf.rate.delta_t;
+    F32 rc = 1.f/(tau_F32*cutoff_freq);
+    F32 alpha = dt/(dt + rc);
+    
+    F32 n_alpha = 1.f - alpha;
+    
+    I1U64 range_i_unclamped = audgen_i_from_t(buf.rate, range_t);
+    I1U64 range_i = intr_clamp_top(range_i_unclamped, buf.count);
+    
+    if (range_i.min < range_i.max){
+        F32 *ptr = buf.buf + range_i.min;
+        F32 v = alpha*(*ptr);
+        *ptr = v;
+        
+        for (U64 i = range_i.min + 1; i < range_i.max; i += 1, ptr += 1){
+            F32 next_v = alpha*(*ptr) + n_alpha*v;
+            v = next_v;
+            *ptr = v;
+        }
+    }
+}
+
+function void
+audgen_high_pass_in_place(AUDGEN_Buffer buf, I1F32 range_t, F32 cutoff_freq){
+    F32 dt = buf.rate.delta_t;
+    F32 rc = 1.f/(tau_F32*cutoff_freq);
+    F32 alpha = rc/(rc + dt);
+    
+    I1U64 range_i_unclamped = audgen_i_from_t(buf.rate, range_t);
+    I1U64 range_i = intr_clamp_top(range_i_unclamped, buf.count);
+    
+    if (range_i.min < range_i.max){
+        F32 *ptr = buf.buf;
+        F32 prev_v = *ptr;
+        F32 prev_w = prev_v;
+        ptr += 1;
+        for (U64 i = range_i.min + 1; i < range_i.max; i += 1){
+            F32 w = *ptr;
+            F32 v = alpha*(prev_v + w - prev_w);
+            *ptr = v;
+            prev_v = v;
+            prev_w = w;
+        }
+    }
+}
+
+////////////////////////////////
 // NOTE(allen): Audio Generation Signal Shapes
+
+#define DO_LIN_BEND 0
 
 function void
 audgen_mix_shape_sin(AUDGEN_Buffer buf, I1F32 range_t,
@@ -70,6 +123,9 @@ audgen_mix_shape_sin(AUDGEN_Buffer buf, I1F32 range_t,
     F32 max_t = range_t.max - range_t.min;
     I1F32 param_mix  = params->mix;
     I1F32 param_freq = params->freq;
+    I1F32 param_log_freq = i1f32(ln_F32(param_freq.min),
+                                 ln_F32(param_freq.max));
+    
     F32 s = 0.f;
     F32 t = 0.f;
     F32 *out = buf.buf + range_i.min;
@@ -87,7 +143,12 @@ audgen_mix_shape_sin(AUDGEN_Buffer buf, I1F32 range_t,
         // mix in sample
         *out += v*mix;
         // increment shape
-        F32 freq_s  = lerp_range(param_freq, tone_s);
+#if DO_LIN_BEND
+        F32 freq_s = lerp_range(param_freq, tone_s);
+#else
+        F32 log_freq_s = lerp_range(param_log_freq, tone_s);
+        F32 freq_s = pow_F32(e_F32, log_freq_s);
+#endif
         F32 delta_s = freq_s*buf.rate.delta_t;
         s += delta_s;
         if (s > 1.f){
@@ -108,6 +169,9 @@ audgen_mix_shape_sqr(AUDGEN_Buffer buf, I1F32 range_t,
     F32 max_t = range_t.max - range_t.min;
     I1F32 param_mix  = params->mix;
     I1F32 param_freq = params->freq;
+    I1F32 param_log_freq = i1f32(ln_F32(param_freq.min),
+                                 ln_F32(param_freq.max));
+    
     F32 s = 0.f;
     F32 t = 0.f;
     F32 *out = buf.buf + range_i.min;
@@ -125,7 +189,12 @@ audgen_mix_shape_sqr(AUDGEN_Buffer buf, I1F32 range_t,
         // mix in sample
         *out += v*mix;
         // increment shape
-        F32 freq_s  = lerp_range(param_freq, tone_s);
+#if DO_LIN_BEND
+        F32 freq_s = lerp_range(param_freq, tone_s);
+#else
+        F32 log_freq_s = lerp_range(param_log_freq, tone_s);
+        F32 freq_s = pow_F32(e_F32, log_freq_s);
+#endif
         F32 delta_s = freq_s*buf.rate.delta_t;
         s += delta_s;
         if (s > 1.f){
@@ -146,6 +215,9 @@ audgen_mix_shape_saw(AUDGEN_Buffer buf, I1F32 range_t,
     F32 max_t = range_t.max - range_t.min;
     I1F32 param_mix  = params->mix;
     I1F32 param_freq = params->freq;
+    I1F32 param_log_freq = i1f32(ln_F32(param_freq.min),
+                                 ln_F32(param_freq.max));
+    
     F32 s = 0.f;
     F32 t = 0.f;
     F32 *out = buf.buf + range_i.min;
@@ -162,7 +234,12 @@ audgen_mix_shape_saw(AUDGEN_Buffer buf, I1F32 range_t,
         // mix in sample
         *out += v*mix;
         // increment shape
-        F32 freq_s  = lerp_range(param_freq, tone_s);
+#if DO_LIN_BEND
+        F32 freq_s = lerp_range(param_freq, tone_s);
+#else
+        F32 log_freq_s = lerp_range(param_log_freq, tone_s);
+        F32 freq_s = pow_F32(e_F32, log_freq_s);
+#endif
         F32 delta_s = freq_s*buf.rate.delta_t;
         s += delta_s;
         if (s > 1.f){
@@ -183,6 +260,9 @@ audgen_mix_shape_tri(AUDGEN_Buffer buf, I1F32 range_t,
     F32 max_t = range_t.max - range_t.min;
     I1F32 param_mix  = params->mix;
     I1F32 param_freq = params->freq;
+    I1F32 param_log_freq = i1f32(ln_F32(param_freq.min),
+                                 ln_F32(param_freq.max));
+    
     F32 s = 0.f;
     F32 t = 0.f;
     F32 *out = buf.buf + range_i.min;
@@ -202,7 +282,12 @@ audgen_mix_shape_tri(AUDGEN_Buffer buf, I1F32 range_t,
         // mix in sample
         *out += v*mix;
         // increment shape
-        F32 freq_s  = lerp_range(param_freq, tone_s);
+#if DO_LIN_BEND
+        F32 freq_s = lerp_range(param_freq, tone_s);
+#else
+        F32 log_freq_s = lerp_range(param_log_freq, tone_s);
+        F32 freq_s = pow_F32(e_F32, log_freq_s);
+#endif
         F32 delta_s = freq_s*buf.rate.delta_t;
         s += delta_s;
         if (s > 1.f){
@@ -211,6 +296,18 @@ audgen_mix_shape_tri(AUDGEN_Buffer buf, I1F32 range_t,
         // increment track
         t += buf.rate.delta_t;
         out += 1;
+    }
+}
+
+function void
+audgen_mix_shape_white_noise(AUDGEN_Buffer buf, I1F32 range_t, U64 seed,
+                             F32 volume_linear){
+    I1U64 range_i_unclamped = audgen_i_from_t(buf.rate, range_t);
+    I1U64 range_i = intr_clamp_top(range_i_unclamped, buf.count);
+    PRNG prng = prng_make_from_seed(seed);
+    F32 *out = buf.buf + range_i.min;
+    for (U64 i = range_i.min; i < range_i.max; i += 1, out += 1){
+        *out = prng_next_biunital_f32(&prng)*volume_linear;
     }
 }
 
@@ -247,7 +344,7 @@ audgen_mul_adsr(AUDGEN_Buffer buf, AUDGEN_ADSRCurve *adsr,
     I1U64 range_i = intr_clamp_top(range_i_unclamped, buf.count);
     F32 max_t = release_t - attack_t;
     F32 t = range_t.min;
-    F32 *out = buf.buf;
+    F32 *out = buf.buf + range_i.min;
     for (U64 i = range_i.min; i < range_i.max; i += 1){
         F32 adsr_m = audgen_sample_adsr(adsr, t - attack_t, max_t);
         *out *= adsr_m;
@@ -291,5 +388,41 @@ audgen_timeline_render(M_Arena *arena, AUDGEN_Timeline *l){
             *dst += *src;
         }
     }
+    return(result);
+}
+
+function void
+audgen_assert_timeline_invariants(AUDGEN_Timeline *timeline){
+    U64 count = 0;
+    for (AUDGEN_TimelineSound *node = timeline->first;
+         node != 0;
+         node = node->next){
+        count += 1;
+    }
+    Assert(timeline->sound_count == count);
+}
+
+////////////////////////////////
+// NOTE(allen): Scale Functions
+
+function AUDGEN_PitchTable
+audgen_get_ntet_pitch_table(M_Arena *arena, AUDGEN_NTETParams *params){
+    // NOTE(allen): Slow version - expected use is one-time setup.
+    //  I haven't studied the numerical precision vs speed tradeoffs.
+    
+    U32 subdivision_count = params->n;
+    U32 tone_count = params->opl_tone;
+    
+    AUDGEN_PitchTable result = {};
+    result.pitch = push_array(arena, F32, tone_count);
+    
+    F32 half_step = pow_F32(2.f, 1.f/(F32)subdivision_count);
+    F32 mid_tone_F32 = (F32)params->mid_tone;
+    F32 low_freq  = params->mid_freq*pow_F32(half_step, -mid_tone_F32);
+    
+    for (U32 i = 0; i < tone_count; i += 1){
+        result.pitch[i] = low_freq*pow_F32(half_step, i);
+    }
+    
     return(result);
 }

@@ -10,5 +10,6 @@
 #include "base_memory.h"
 #include "base_string.h"
 #include "base_buffer_ops.h"
+#include "base_prng.h"
 
 #endif //BASE_INC_H

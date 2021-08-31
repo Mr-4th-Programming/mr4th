@@ -5,7 +5,7 @@ set libs=Winmm.lib Userenv.lib Advapi32.lib
 set cl_opts=-FC -GR- -EHa- -nologo -Zi %opts%
 set clang_opts=%opts%
 set exe_name=test.exe
-set code=%cd%
+set code=%cd%\src
 pushd build
 cl -Fe%exe_name% %cl_opts% %libs% %code%\main.cpp
 rem clang -o %exe_name% %clang_opts% %libs% %code%\main.cpp

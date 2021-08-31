@@ -18,6 +18,8 @@
 
 #include <stdio.h>
 
+//$ bar baz bar bar baz foo bar foo baz foofoobar //
+
 ////////////////////////////////
 // NOTE(allen): Main
 

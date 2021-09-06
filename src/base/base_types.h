@@ -125,7 +125,7 @@
 #define Stmnt(S) do{ S }while(0)
 
 #if !defined(AssertBreak)
-# define AssertBreak() (*(int*)0 = 0)
+# define AssertBreak() (*(volatile int*)0 = 0)
 #endif
 
 #if ENABLE_ASSERT

@@ -1,0 +1,13 @@
+###### link ###################################################################
+lld-link>-nologo
+lld-link>-DEFAULTLIB:libcmt
+lld-link>-OPT:REF
+lld-link>-INCREMENTAL:NO
+lld-link>-DEBUG
+lld-link>x64>-MACHINE:X64
+lld-link>-SUBSYSTEM:CONSOLE
+lld-link>Winmm.lib
+lld-link>Userenv.lib
+lld-link>Advapi32.lib
+
+

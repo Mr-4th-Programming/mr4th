@@ -18,7 +18,7 @@
 
 #include <stdio.h>
 
-//$ bar baz bar bar baz foo bar foo baz foofoobar //
+//$ main1 main2 main3 //
 
 ////////////////////////////////
 // NOTE(allen): Main

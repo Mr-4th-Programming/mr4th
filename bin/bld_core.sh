@@ -149,7 +149,7 @@ function bld_compile {
   fi
   
   ###### finish in file #####################################################
-  local final_in_file=$root_path/$in_file
+  local final_in_file=$in_file
   
   ###### finish options #####################################################
   local src_opts=($(bld_opts_from_src $final_in_file))
@@ -298,6 +298,145 @@ function bld_link {
   return $status
 }
 
+###### Library ################################################################
+
+function bld_lib {
+  ###### parse arguments ####################################################
+  local out_name=$1
+  local in_files=()
+  for ((i=2; i<=$#; i+=1)); do
+    if [ "${!i}" == "--" ]; then
+      break
+    fi
+    in_files+=(${!i})
+  done
+  local opts=()
+  for ((i+=1; i<=$#; i+=1)); do
+    opts+=(${!i})
+  done
+  if [ "$out_name" == "" ]; then
+    echo "lib: missing output name"
+    return 1
+  fi
+  if [ "${#in_files}" == "0" ]; then
+    echo "lib: missing input file(s)"
+    return 1
+  fi
+  
+  ###### finish options #####################################################
+  local all_opts=($(bld_dedup ${opts[@]}))
+  
+  ###### sort in files ######################################################
+  local in_src=()
+  local in_obj=()
+  for ((i=0; i<${#in_files[@]}; i+=1)); do
+    local file="${in_files[i]}"
+    local ext="${file##*.}"
+    if [[ "$ext" == "c" || "$ext" == "cpp" ]]; then
+      in_src+=($file)
+    elif [[ "$ext" == "o" || "$ext" == "obj" ]]; then
+      in_obj+=($file)
+    else
+      echo "WARNING: ingnoring unrecgonized file type $file"
+    fi
+  done
+  
+  ###### auto correct object files ##########################################
+  for ((i=0; i<${#in_obj[@]}; i+=1)); do
+    local file_name="${in_obj[i]}"
+    local base_name="${file_name%.*}"
+    in_obj[$i]=$base_name$dot_ext_obj
+  done
+  
+  ###### compile source files ###############################################
+  for ((i=0; i<${#in_src[@]}; i+=1)); do
+    bld_compile "${in_src[i]}" ${all_opts[@]}
+    local status=$?
+    if [ $status -ne 0 ]; then
+      return $status
+    fi
+  done
+  
+  ###### intermediate object files ##########################################
+  local interm_obj=()
+  for ((i=0; i<${#in_src[@]}; i+=1)); do
+    local file_name="${in_src[i]}"
+    local base_name="${file_name##*/}"
+    local base_name_no_ext="${base_name%.*}"
+    interm_obj+=($base_name_no_ext$dot_ext_obj)
+  done
+  
+  ###### out file name ######################################################
+  local out_file=""
+  if [ "$os" == "windows" ]; then
+    out_file="$out_name.lib"
+  elif [ "$os" == "linux" || "$os" == "mac" ]; then
+    out_file="lib$out_name.a"
+  else
+    echo "ERROR: static library output not defined for OS: $os"
+  fi
+  
+  ###### final library build input files ####################################
+  local final_in_files="${interm_obj[@]} ${in_obj[@]}"
+  
+  ###### print output file ##################################################
+  echo "$out_file"
+  
+  ###### move to output folder ##############################################
+  mkdir -p "$build_path"
+  cd $build_path
+  
+  ###### build library ######################################################
+  local status=0
+  if [ "$os" == "windows" ]; then
+    echo lib -nologo -OUT:"$out_file" $final_in_files
+    lib -nologo -OUT:"$out_file" $final_in_files
+    status=$?
+  elif [ "$os" == "linux" || "$os" == "mac" ]; then
+    # TODO(allen): invoke ar here - make sure to delete the original .a first
+    # because ar does not (seem) to replace the output file, just append
+    echo "TODO: implement ar path in bld_core.sh:bld_lib"
+    status=1
+  else
+    echo "ERROR: static library invokation not defined for OS: $os"
+    status=1
+  fi
+  
+  return $status
+}
+
+###### Unit ###################################################################
+
+function bld_unit {
+  ###### parse arguments ####################################################
+  local main_file=$1
+  local opts=()
+  for ((i=2; i<=$#; i+=1)); do
+    opts+=(${!i})
+  done
+  if [ "$main_file" == "" ]; then
+    echo "unit: missing main file"
+    return 1
+  fi
+  
+  ###### set out name #######################################################
+  local out_name=""
+  if [ "${#opts}" == "0" ]; then
+    local file_base=${main_file##*/}
+    local file_base_no_ext=${file_base%.*}
+    out_name=$file_base_no_ext
+  else
+    out_name="${opts[0]}"
+  fi
+  
+  ###### finish options #####################################################
+  local src_opts=$(bld_opts_from_src $main_file)
+  local all_opts=($(bld_dedup $out_name ${opts[@]} ${src_opts[@]} ${implicit_opts[@]}))
+  
+  ###### link ###############################################################
+  bld_link $out_name $main_file ${in_files[@]} -- ${all_opts[@]}
+}
+
 ###### OS Cracking ############################################################
 os="undefined"
 if [ "$OSTYPE" == "win32" ] ||
@@ -311,7 +450,6 @@ fi
 
 
 ###### Get Paths ##############################################################
-og_path=$PWD
 cd "$(dirname "$0")"
 cd ..
 
@@ -360,11 +498,3 @@ if [ "$linker" == "clang" ]; then
   linker_kind="clang"
 fi
 
-
-###### Testing ################################################################
-echo "implicit opts: ${implicit_opts[@]}"
-
-bld_link test src/main.cpp -- ${implicit_opts[@]}
-
-###### Restore Path ###########################################################
-cd $og_path

@@ -8,6 +8,7 @@ patterns = {
 "*.bat",
 "*.sh",
 "*.4coder",
+"*.txt",
 };
 blacklist_patterns = {
 ".*",
@@ -23,18 +24,18 @@ load_paths = {
 
 commands = {
  .build = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
-   .win = "build.bat",
-   .linux = "./build.sh",
-   .mac = "./build.sh", },
+   .win = "git_bash bin/build_main_test.sh",
+   .linux = "bin/build_main_test.sh",
+   .mac = "bin/build_main_test.sh", },
  .run = { .out = "*run*", .footer_panel = false, .save_dirty_files = false,
    .win = "pushd build & test a b foo bar -- \"a b c d\"",
    .linux = "build/test",
    .mac = "build/test", },
 
  .build_play_temp_wave = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
-   .win = "build_play_temp_wave.bat",
-   .linux = "./build_play_temp_wave.sh",
-   .mac = "./build_play_temp_wave.sh", },
+   .win = "git_bash bin/build_play_temp_wave.sh",
+   .linux = "bin/build_play_temp_wave.sh",
+   .mac = "bin/build_play_temp_wave.sh", },
  .run_play_temp_wave = { .out = "*run*", .footer_panel = false, .save_dirty_files = false,
    .win = "pushd build & play_temp_wave",
    .linux = "build/play_temp_wave",

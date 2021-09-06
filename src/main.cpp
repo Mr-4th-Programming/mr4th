@@ -18,8 +18,6 @@
 
 #include <stdio.h>
 
-//$ main1 main2 main3 //
-
 ////////////////////////////////
 // NOTE(allen): Main
 

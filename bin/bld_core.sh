@@ -134,6 +134,18 @@ function bld_has_opt {
   echo $has_key
 }
 
+###### Load Local Options #####################################################
+
+function bld_load_local_opts {
+  source "$local_path/bld_params.sh"
+}
+
+###### Implicit Opts ##########################################################
+
+function bld_implicit_opts {
+  echo $compiler $compile_mode $os $arch $linker $ctx_opts
+}
+
 ###### Compile ################################################################
 
 function bld_compile {
@@ -153,8 +165,11 @@ function bld_compile {
   
   ###### finish options #####################################################
   local src_opts=($(bld_opts_from_src $final_in_file))
-  # TODO(allen): implicit options here?
-  local all_opts=($(bld_dedup ${opts[@]} ${src_opts[@]}))
+  local impl_opts=($(bld_implicit_opts))
+  local all_opts=($(bld_dedup ${impl_opts[@]} ${opts[@]} ${src_opts[@]}))
+  
+  ###### diagnostics ########################################################
+  local diagnostics=$(bld_has_opt diagnostics ${all_opts[@]})
   
   ###### out file name ######################################################
   local file_base=${final_in_file##*/}
@@ -176,9 +191,15 @@ function bld_compile {
   ###### final flags ########################################################
   local final_flags="-c -I$src_path ${flags}"
   
+  
   ###### compile ############################################################
+  if [ "$diagnostics" == "1" ]; then
+    echo "cmp $final_in_file -- ${all_opts[@]}"
+    echo $compiler "$final_in_file" $final_flags
+  fi
+  # TODO(allen): manually print souce file depending on the compiler
   $compiler "$final_in_file" $final_flags
-
+  
   # return of status from compiler is automatic here.
 }
 
@@ -208,8 +229,11 @@ function bld_link {
   fi
   
   ###### finish options #####################################################
-  # TODO(allen): implicit options here?
-  local all_opts=($(bld_dedup ${opts[@]}))
+  local impl_opts=($(bld_implicit_opts))
+  local all_opts=($(bld_dedup ${opts[@]} ${impl_opts[@]}))
+  
+  ###### diagnostics ########################################################
+  local diagnostics=$(bld_has_opt diagnostics ${all_opts[@]})
   
   ###### sort in files ######################################################
   local in_src=()
@@ -241,7 +265,7 @@ function bld_link {
     bld_compile "${in_src[i]}" ${all_opts[@]}
     local status=$?
     if [ $status -ne 0 ]; then
-      exit $status
+      return $status
     fi
   done
   
@@ -259,16 +283,9 @@ function bld_link {
   local flags=$(bld_flags_from_opts $flags_file ${all_opts[@]})
   
   ###### out file name ######################################################
-  local bin_kind="exe"
-  for ((i=0; i<${#all_opts[@]}; i+=1)); do
-    if [[ "${all_opts[i]}" == "dll" ]]; then
-      bin_kind="dll"
-      break
-    fi
-  done
-  
+  local is_dll=$(bld_has_opt dll ${all_opts[@]})
   dot_ext_out="$dot_ext_exe"
-  if [ "$bin_kind" == "dll" ]; then
+  if [ "$is_dll" == "1" ]; then
     dot_ext_out="$dot_ext_dll"
   fi
   out_file="$out_name$dot_ext_out"
@@ -277,16 +294,27 @@ function bld_link {
   mkdir -p "$build_path"
   cd $build_path
   
-  ###### Final Files to Linker ##############################################
+  ###### final files to linker ##############################################
   local final_in_files="${interm_obj[@]} ${in_obj[@]} ${in_lib[@]}"
+  
+  ###### set first diagnostic string ########################################
+  local first_diagnostic_string="lnk $final_in_files -- ${all_opts[@]}"
   
   ###### link ###############################################################
   local status=0
   if [ "$linker_kind" == "link" ]; then
+    if [ "$diagnostics" == "1" ]; then
+      echo $first_diagnostic_string
+      echo $linker -OUT:"$out_file" $flags $final_in_files
+    fi
     echo "$out_file"
     $linker -OUT:"$out_file" $flags $final_in_files
     status=$?
   elif [ "$linker_kind" == "clang" ]; then
+    if [ "$diagnostics" == "1" ]; then
+      echo $first_diagnostic_string
+      echo $linker -o "$out_file" $flags $final_in_files
+    fi
     echo "$out_file"
     $linker -o "$out_file" $flags $final_in_files
     status=$?
@@ -324,7 +352,11 @@ function bld_lib {
   fi
   
   ###### finish options #####################################################
-  local all_opts=($(bld_dedup ${opts[@]}))
+  local impl_opts=($(bld_implicit_opts))
+  local all_opts=($(bld_dedup ${opts[@]} ${impl_opts[@]}))
+  
+  ###### diagnostics ########################################################
+  local diagnostics=$(bld_has_opt diagnostics ${all_opts[@]})
   
   ###### sort in files ######################################################
   local in_src=()
@@ -379,17 +411,21 @@ function bld_lib {
   ###### final library build input files ####################################
   local final_in_files="${interm_obj[@]} ${in_obj[@]}"
   
-  ###### print output file ##################################################
-  echo "$out_file"
-  
   ###### move to output folder ##############################################
   mkdir -p "$build_path"
   cd $build_path
   
+  ###### set first diagnostic string ########################################
+  local first_diagnostic_string="lib $final_in_files -- ${all_opts[@]}"
+  
   ###### build library ######################################################
   local status=0
   if [ "$os" == "windows" ]; then
-    echo lib -nologo -OUT:"$out_file" $final_in_files
+    if [ "$diagnostics" == "1" ]; then
+      echo $first_diagnostic_string
+      echo lib -nologo -OUT:"$out_file" $final_in_files
+    fi
+    echo "$out_file"
     lib -nologo -OUT:"$out_file" $final_in_files
     status=$?
   elif [ "$os" == "linux" || "$os" == "mac" ]; then
@@ -431,7 +467,8 @@ function bld_unit {
   
   ###### finish options #####################################################
   local src_opts=$(bld_opts_from_src $main_file)
-  local all_opts=($(bld_dedup $out_name ${opts[@]} ${src_opts[@]} ${implicit_opts[@]}))
+  local impl_opts=($(bld_implicit_opts))
+  local all_opts=($(bld_dedup $out_name ${opts[@]} ${src_opts[@]} ${impl_opts[@]}))
   
   ###### link ###############################################################
   bld_link $out_name $main_file ${in_files[@]} -- ${all_opts[@]}
@@ -459,14 +496,14 @@ local_path="$root_path/local"
 build_path="$root_path/build"
   src_path="$root_path/src"
 
+# TODO(allen): Ideas on how to improve this script's isolation from the context.
+# 1. User provides the path to compiler flags and linker flags files.
+# 2. User provides the path to local params script.
+# 3. User provides the build path ans source path.
 
-###### Get Local Parameters ###################################################
-source "$local_path/bld_params.sh"
 
-
-###### Implicit Options #######################################################
-implicit_opts=($compiler $compile_mode $os $arch $linker)
-
+###### Load Locals ############################################################
+bld_load_local_opts
 
 ###### Object File Extension ##################################################
 # TODO(allen): isolating special ifs?
@@ -498,3 +535,5 @@ if [ "$linker" == "clang" ]; then
   linker_kind="clang"
 fi
 
+###### Tests ##################################################################
+#bld_lib main $src_path/main.cpp -- diagnostics

@@ -137,13 +137,40 @@ function bld_has_opt {
 ###### Load Local Options #####################################################
 
 function bld_load_local_opts {
-  source "$local_path/bld_params.sh"
+  ###### os cracking ########################################################
+  os="undefined"
+  if [ "$OSTYPE" == "win32" ] ||
+     [ "$OSTYPE" == "msys"  ]; then
+    os="windows"
+  elif [ "$OSTYPE" == "linux-gnu" ]; then
+    os="linux"
+  elif [ "$OSTYPE" == "darwin" ]; then
+    os="mac"
+  fi
+  ###### load parameters from the local script ################################
+  if [ -f "$local_path/bld_params.sh" ]; then
+    source "$local_path/bld_params.sh"
+  fi
 }
 
 ###### Implicit Opts ##########################################################
 
 function bld_implicit_opts {
   echo $compiler $compile_mode $os $arch $linker $ctx_opts
+}
+
+###### Print Implicit Options #################################################
+
+function bld_print_implicit_opts {
+  local opts=($(bld_implicit_opts))
+  local bracketed=()
+  for ((i=0; i<=${#opts[@]}; i+=1)); do
+    local opt="${opts[i]}"
+    if [ "$opt" != "" ]; then
+      bracketed+=("[${opts[i]}]")
+    fi
+  done
+  echo "${bracketed[@]}"
 }
 
 ###### Compile ################################################################
@@ -172,13 +199,13 @@ function bld_compile {
   local diagnostics=$(bld_has_opt diagnostics ${all_opts[@]})
   
   ###### out file name ######################################################
+  local dot_ext_obj=$(bld_ext_obj)
   local file_base=${final_in_file##*/}
   local file_base_no_ext=${file_base%.*}
   local out_file="$file_base_no_ext$dot_ext_obj"
   
   ###### get real flags #####################################################
-  local flags_file=$bin_path/compiler_flags.txt
-  local flags=$(bld_flags_from_opts $flags_file ${all_opts[@]})
+  local flags=$(bld_flags_from_opts $compiler_flags_path ${all_opts[@]})
   
   ###### move to output folder ##############################################
   mkdir -p "$build_path"
@@ -254,6 +281,7 @@ function bld_link {
   done
   
   ###### auto correct object files ##########################################
+  local dot_ext_obj=$(bld_ext_obj)
   for ((i=0; i<${#in_obj[@]}; i+=1)); do
     local file_name="${in_obj[i]}"
     local base_name="${file_name%.*}"
@@ -279,14 +307,15 @@ function bld_link {
   done
   
   ###### get real flags #####################################################
-  local flags_file=$bin_path/linker_flags.txt
-  local flags=$(bld_flags_from_opts $flags_file ${all_opts[@]})
+  local flags=$(bld_flags_from_opts $linker_flags_path ${all_opts[@]})
   
   ###### out file name ######################################################
+  local dot_ext_out=""
   local is_dll=$(bld_has_opt dll ${all_opts[@]})
-  dot_ext_out="$dot_ext_exe"
-  if [ "$is_dll" == "1" ]; then
-    dot_ext_out="$dot_ext_dll"
+  if [ "$is_dll" == "0" ]; then
+    dot_ext_out=$(bld_ext_exe)
+  else
+    dot_ext_out=$(bld_ext_dll)
   fi
   out_file="$out_name$dot_ext_out"
   
@@ -302,27 +331,24 @@ function bld_link {
   
   ###### link ###############################################################
   local status=0
-  if [ "$linker_kind" == "link" ]; then
-    if [ "$diagnostics" == "1" ]; then
-      echo $first_diagnostic_string
-      echo $linker -OUT:"$out_file" $flags $final_in_files
-    fi
-    echo "$out_file"
-    $linker -OUT:"$out_file" $flags $final_in_files
-    status=$?
-  elif [ "$linker_kind" == "clang" ]; then
-    if [ "$diagnostics" == "1" ]; then
-      echo $first_diagnostic_string
-      echo $linker -o "$out_file" $flags $final_in_files
-    fi
-    echo "$out_file"
-    $linker -o "$out_file" $flags $final_in_files
-    status=$?
+  local invokation=""
+  if [[ "$linker" == "link" || "$linker" == "lld-link" ]]; then
+    invokation="$linker -OUT:$out_file $flags $final_in_files"
+  elif [ "$linker" == "clang" ]; then
+    invokation="$linker -o \"$out_file\" $flags $final_in_files"
   else
     echo "ERROR: invokation not defined for this linker"
     status=1
   fi
-  
+  if [ "$invokation" != "" ]; then
+    if [ "$diagnostics" == "1" ]; then
+      echo $first_diagnostic_string
+      echo $invokation
+    fi
+    echo "$out_file"
+    $invokation
+    status=$?
+  fi
   return $status
 }
 
@@ -374,6 +400,7 @@ function bld_lib {
   done
   
   ###### auto correct object files ##########################################
+  local dot_ext_obj=$(bld_ext_obj)
   for ((i=0; i<${#in_obj[@]}; i+=1)); do
     local file_name="${in_obj[i]}"
     local base_name="${file_name%.*}"
@@ -474,66 +501,24 @@ function bld_unit {
   bld_link $out_name $main_file ${in_files[@]} -- ${all_opts[@]}
 }
 
-###### OS Cracking ############################################################
-os="undefined"
-if [ "$OSTYPE" == "win32" ] ||
-   [ "$OSTYPE" == "msys"  ]; then
-  os="windows"
-elif [ "$OSTYPE" == "linux-gnu" ]; then
-  os="linux"
-elif [ "$OSTYPE" == "darwin" ]; then
-  os="mac"
-fi
+###### Special Ifs ############################################################
 
+function bld_ext_obj {
+  echo $(bld_flags_from_opts $file_extensions_path $compiler obj)
+}
+function bld_ext_exe {
+  echo $(bld_flags_from_opts $file_extensions_path $os exe)
+}
+function bld_ext_dll {
+  echo $(bld_flags_from_opts $file_extensions_path $os dll)
+}
 
 ###### Get Paths ##############################################################
-cd "$(dirname "$0")"
-cd ..
-
- root_path=$PWD
-  bin_path="$root_path/bin"
-local_path="$root_path/local"
-build_path="$root_path/build"
-  src_path="$root_path/src"
-
-# TODO(allen): Ideas on how to improve this script's isolation from the context.
-# 1. User provides the path to compiler flags and linker flags files.
-# 2. User provides the path to local params script.
-# 3. User provides the build path ans source path.
-
+if [ ! -f "$bld_path/bld_core.sh" ]; then
+ echo bld_path set incorrectly
+ exit 1
+fi
+local_path="$bld_path/local"
 
 ###### Load Locals ############################################################
 bld_load_local_opts
-
-###### Object File Extension ##################################################
-# TODO(allen): isolating special ifs?
-dot_ext_obj=".o"
-if [[ "$compiler" == "cl" ]]; then
-  dot_ext_obj=".obj"
-fi
-
-
-###### Binary File Extension ##################################################
-# TODO(allen): isolating special ifs?
-dot_ext_exe=""
-dot_ext_dll=""
-if [ "$os" == "windows" ]; then
-  dot_ext_exe=".exe"
-  dot_ext_dll=".dll"
-elif [ "$os" == "linux" ] || [ "$os" == "mac" ]; then
-  dot_ext_exe=""
-  dot_ext_dll=".so"
-else
-  echo "ERROR: binary extension not defined for OS: $os"
-fi
-
-
-###### Linker Kind ############################################################
-# TODO(allen): isolating special ifs?
-linker_kind="link"
-if [ "$linker" == "clang" ]; then
-  linker_kind="clang"
-fi
-
-###### Tests ##################################################################
-#bld_lib main $src_path/main.cpp -- diagnostics

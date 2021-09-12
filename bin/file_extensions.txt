@@ -1,0 +1,10 @@
+obj>cl>.obj
+obj>clang>.o
+obj>gcc>.o
+
+exe>windows>.exe
+dll>windows>.dll
+dll>linux>.so
+dll>mac>.so
+
+

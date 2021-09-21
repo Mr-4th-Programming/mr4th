@@ -10,5 +10,6 @@ clang>-Wno-switch
 
 ###### Debug ##################################################################
 debug>-DENABLE_ASSERT=1
+release>-DENABLE_ASSERT=0
 cl>debug>-Zi
 

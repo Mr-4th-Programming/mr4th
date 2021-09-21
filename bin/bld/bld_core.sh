@@ -1,5 +1,74 @@
 #!/bin/bash
 
+###### Usage ##################################################################
+# This script is meant to be invoked by the 'source' command. The variable
+# bld_path should first be set to contain the path to the root folder of the
+# bld system:
+#   bld_path="$(dirname $(realpath "$0"))"/<path-from-here-to-bld>
+#   source "$bld_path/bld_core.sh"
+#
+#
+# The following bld functions form the core "bld commands":
+#   bld_compile, bld_link, bld_lib, bld_unit
+#
+#  And there are several more helper functions:
+#   bld_print_implicit_opts, bld_load_local_opts
+#
+#
+# Signatures:
+#   bld_compile <source-file> <zero-or-more-options>
+#   bld_link <out-name> <one-or-more-source-files-objs-or-libs> -- <zero-or-more-options>
+#   bld_lib <out-name> <one-or-more-source-files-or-objs> -- <zero-or-more-options>
+#   bld_unit <source-file> <zero-or-more-options>
+#
+#   bld_print_implicit_opts (no arguments)
+#   bld_load_local_opts (no arguments)
+#
+#
+# Shared notes for all:
+# + Options are gathered from the command line, from the local context, and
+# in the case of the commands bld_compile and bld_unit, from the source file.
+# + Options in source files are specified between the strings //$ and //.
+#  Object files and library files should be specified with the extensions
+# .obj and .lib respectively. The system automatically modifies the names to
+# match the naming used by the selected context.
+# + When the option "diagnostics" is included extra details will be printed
+# from the bld commands. Showing the full list of options, invokation lines,
+# and the build path.
+#
+# bld_compile:
+# + Creates an object file from a single source file via the selected compiler.
+#
+# bld_link:
+# + Creates executables and shared binaries from source files, object files,
+# and static libraries. First uses the bld_compile command on the source files.
+# Uses the selected linker.
+# + The output is a shared binary (.dll or .so) when the option "dll" is
+# included.
+#
+# bld_lib:
+# + Creates a static library from source files and object files. First uses
+# the bld_compile command on the source files. Uses the OS to determine the
+# correct archiver.
+#
+# bld_unit:
+# + Creates an executable (or shared binary) from a single source file.
+# This command essentially does a single bld_compile then bld_link. With
+# two differences:
+#  1. The options from the source file are visible to the bld_link.
+#  2. The name of the executable is determined either from the first option 
+#     in the list or from the source file name if there are no options.
+#
+# bld_print_implicit_opts:
+# + Shows the implicit options loaded from the local parameters script.
+#
+# bld_load_local_opts:
+# + It is possible and sometimes useful to modify the local parameters after
+# they are loaded to create certain kinds of build scripts. This function
+# resets the local parameters to their original states by rerunning the
+# local parameters script.
+
+
 ###### Flags From Opts ########################################################
 
 function bld_flags_from_opts {
@@ -210,6 +279,9 @@ function bld_compile {
   ###### move to output folder ##############################################
   mkdir -p "$build_path"
   cd $build_path
+  if [ "$diagnostics" == "1" ]; then
+    echo "build path: $build_path"
+  fi
   
   ###### delete existing object file ########################################
   rm -f "$out_file_base.o"
@@ -224,7 +296,9 @@ function bld_compile {
     echo "cmp $final_in_file -- ${all_opts[@]}"
     echo $compiler "$final_in_file" $final_flags
   fi
-  # TODO(allen): manually print souce file depending on the compiler
+  if [ "$compiler" == "clang" ]; then
+    echo "$file_base"
+  fi
   $compiler "$final_in_file" $final_flags
   
   # return of status from compiler is automatic here.
@@ -322,6 +396,9 @@ function bld_link {
   ###### move to output folder ##############################################
   mkdir -p "$build_path"
   cd $build_path
+  if [ "$diagnostics" == "1" ]; then
+    echo "build path: $build_path"
+  fi
   
   ###### final files to linker ##############################################
   local final_in_files="${interm_obj[@]} ${in_obj[@]} ${in_lib[@]}"
@@ -441,6 +518,9 @@ function bld_lib {
   ###### move to output folder ##############################################
   mkdir -p "$build_path"
   cd $build_path
+  if [ "$diagnostics" == "1" ]; then
+    echo "build path: $build_path"
+  fi
   
   ###### set first diagnostic string ########################################
   local first_diagnostic_string="lib $final_in_files -- ${all_opts[@]}"
@@ -522,3 +602,14 @@ local_path="$bld_path/local"
 
 ###### Load Locals ############################################################
 bld_load_local_opts
+
+
+# NOTES - for future iterations of this system
+# + The "source" approach creates problems for locating the bld path because
+# when a script is "sourced" it inherits the $0 from the "caller". Two ideas:
+#   1. There may be a way to fix this issue relating to passing parameters
+#      to the "sourced" script
+#   2. Setup a locator script that can be called the normal way before sourcing
+#      the core to save the bld_path for the core to see
+# + It would be nice to include an automatic slash fixer \ -> /
+

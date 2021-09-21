@@ -179,6 +179,8 @@
 
 #if COMPILER_CL
 # define shared_export __declspec(dllexport)
+#elif COMPILER_CLANG
+# define shared_export __declspec(dllexport)
 #else
 # error shared_export not defined for this compiler
 #endif

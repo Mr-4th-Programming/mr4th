@@ -178,27 +178,27 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
         }
         
         // setup serialization
-        M_Scratch scratch(arena);
+        M_ArenaTemp scratch = m_get_scratch(&arena, 1);
         String8List list = {};
         
         // master header
-        RIFF_MasterChunkHeader *master = push_array(scratch, RIFF_MasterChunkHeader, 1);
-        str8_list_push(scratch, &list, str8_typed(master));
+        RIFF_MasterChunkHeader *master = push_array(scratch.arena, RIFF_MasterChunkHeader, 1);
+        str8_list_push(scratch.arena, &list, str8_typed(master));
         master->riff_id = RIFF_ID_RIFF;
         master->sub_id = WAVE_ID_WAVE;
         
         // fmt chunk
         {
-            RIFF_SubChunkHeader *fmt_header = push_array(scratch, RIFF_SubChunkHeader, 1);
-            str8_list_push(scratch, &list, str8_typed(fmt_header));
+            RIFF_SubChunkHeader *fmt_header = push_array(scratch.arena, RIFF_SubChunkHeader, 1);
+            str8_list_push(scratch.arena, &list, str8_typed(fmt_header));
             fmt_header->id = WAVE_ID_fmt;
             
             // save position of fmt chunk
             U64 fmt_chunk_off = list.total_size;
             
             // fill fmt data
-            WAVE_ChunkFmt *fmt_data = push_array_zero(scratch, WAVE_ChunkFmt, 1);
-            str8_list_push(scratch, &list, str8_typed(fmt_data));
+            WAVE_ChunkFmt *fmt_data = push_array_zero(scratch.arena, WAVE_ChunkFmt, 1);
+            str8_list_push(scratch.arena, &list, str8_typed(fmt_data));
             
             fmt_data->format_tag = tag;
             fmt_data->channel_count = channel_count;
@@ -209,13 +209,13 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
             
             if (required_extension){
                 // fill fmt ext header data
-                WAVE_ChunkFmtExtSize *fmt_extheader = push_array_zero(scratch, WAVE_ChunkFmtExtSize, 1);
-                str8_list_push(scratch, &list, str8_typed(fmt_extheader));
+                WAVE_ChunkFmtExtSize *fmt_extheader = push_array_zero(scratch.arena, WAVE_ChunkFmtExtSize, 1);
+                str8_list_push(scratch.arena, &list, str8_typed(fmt_extheader));
                 fmt_extheader->extension_size = sizeof(WAVE_ChunkFmtExt1);
                 
                 // fill fmt ext data
-                WAVE_ChunkFmtExt1 *fmt_ext = push_array_zero(scratch, WAVE_ChunkFmtExt1, 1);
-                str8_list_push(scratch, &list, str8_typed(fmt_ext));
+                WAVE_ChunkFmtExt1 *fmt_ext = push_array_zero(scratch.arena, WAVE_ChunkFmtExt1, 1);
+                str8_list_push(scratch.arena, &list, str8_typed(fmt_ext));
                 fmt_ext->valid_bits_per_sample = valid_bits_per_sample;
                 fmt_ext->channel_mask = auto_mask;
                 MemoryCopy(fmt_ext->sub_format, &tag, 2);
@@ -230,15 +230,15 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
         
         // data chunk
         {
-            RIFF_SubChunkHeader *data_header = push_array(scratch, RIFF_SubChunkHeader, 1);
-            str8_list_push(scratch, &list, str8_typed(data_header));
+            RIFF_SubChunkHeader *data_header = push_array(scratch.arena, RIFF_SubChunkHeader, 1);
+            str8_list_push(scratch.arena, &list, str8_typed(data_header));
             data_header->id = WAVE_ID_data;
             
             // save position of data chunk
             U64 data_chunk_off = list.total_size;
             
             // push the sample data
-            str8_list_push(scratch, &list, sample_data);
+            str8_list_push(scratch.arena, &list, sample_data);
             
             // fill data header size
             data_header->size = list.total_size - data_chunk_off;
@@ -249,6 +249,8 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
         
         // combine output
         result = str8_join(arena, &list, 0);
+        
+        m_release_scratch(scratch);
     }
     
     return(result);
@@ -259,8 +261,8 @@ wave_render(M_Arena *arena, WAVE_RenderParams *params, String8 sample_data){
 
 function void
 wave_dump(M_Arena *arena, String8List *out, String8 data){
-    M_Scratch scratch(arena);
-    WAVE_SubChunkList chunks = wave_sub_chunks_from_data(scratch, data);
+    M_ArenaTemp scratch = m_get_scratch(&arena, 1);
+    WAVE_SubChunkList chunks = wave_sub_chunks_from_data(scratch.arena, data);
     for (WAVE_SubChunkNode *node = chunks.first;
          node != 0;
          node = node->next){
@@ -290,4 +292,5 @@ wave_dump(M_Arena *arena, String8List *out, String8 data){
             }break;
         }
     }
+    m_release_scratch(scratch);
 }

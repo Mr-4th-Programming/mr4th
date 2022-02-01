@@ -1,10 +1,9 @@
 ////////////////////////////////
 // NOTE(allen): Variables
 
-global DWORD w32_thread_context_index = 0;
 global U64 w32_ticks_per_second = 1;
 
-global M_Arena w32_perm_arena = {};
+global M_Arena *w32_perm_arena = 0;
 global String8 w32_binary_path = {};
 global String8 w32_user_path = {};
 global String8 w32_temp_path = {};
@@ -15,13 +14,7 @@ global String8List w32_cmd_line = {};
 // NOTE(allen): Init
 
 function void
-os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
-    // setup thread contexts
-    w32_thread_context_index = TlsAlloc();
-    
-    // this thread's context
-    os_thread_init(tctx_memory);
-    
+os_main_init(int argc, char **argv){
     // setup precision time
     LARGE_INTEGER perf_freq = {};
     if (QueryPerformanceFrequency(&perf_freq)){
@@ -30,16 +23,16 @@ os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
     timeBeginPeriod(1);
     
     // arena
-    w32_perm_arena = m_make_arena(os_base_memory());
+    w32_perm_arena = m_alloc_arena();
     
     // command line arguments
     for (int i = 0; i < argc; i += 1){
         String8 arg = str8_cstring((U8*)argv[i]);
-        str8_list_push(&w32_perm_arena, &w32_cmd_line, arg);
+        str8_list_push(w32_perm_arena, &w32_cmd_line, arg);
     }
     
     // paths
-    M_Scratch scratch;
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
     
     // binary path
     {
@@ -47,10 +40,10 @@ os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
         U16 *buffer = 0;
         DWORD size = 0;
         for (U64 r = 0; r < 4; r += 1, cap *= 4){
-            U16 *try_buffer = push_array(scratch, U16, cap);
+            U16 *try_buffer = push_array(scratch.arena, U16, cap);
             DWORD try_size = GetModuleFileNameW(0, (WCHAR*)try_buffer, cap);
             if (try_size == cap && GetLastError() == ERROR_INSUFFICIENT_BUFFER){
-                scratch.reset();
+                m_end_temp(scratch);
             }
             else{
                 buffer = try_buffer;
@@ -59,19 +52,19 @@ os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
             }
         }
         
-        String8 full_path = str8_from_str16(scratch, str16(buffer, size));
+        String8 full_path = str8_from_str16(scratch.arena, str16(buffer, size));
         String8 binary_path = str8_chop_last_slash(full_path);
-        w32_binary_path = str8_push_copy(&w32_perm_arena, binary_path);
+        w32_binary_path = str8_push_copy(w32_perm_arena, binary_path);
     }
     
     // user data
     {
         HANDLE token = GetCurrentProcessToken();
         DWORD cap = 2048;
-        U16 *buffer = push_array(scratch, U16, cap);
+        U16 *buffer = push_array(scratch.arena, U16, cap);
         if (!GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
-            scratch.reset();
-            buffer = push_array(scratch, U16, cap + 1);
+            m_end_temp(scratch);
+            buffer = push_array(scratch.arena, U16, cap + 1);
             if (GetUserProfileDirectoryW(token, (WCHAR*)buffer, &cap)){
                 buffer = 0;
             }
@@ -81,37 +74,38 @@ os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv){
             // NOTE(allen): the docs make it sound like we can only count on
             // cap getting the size on failure; so we're just going to cstring
             // this to be safe.
-            w32_user_path = str8_from_str16(&w32_perm_arena, str16_cstring(buffer));
+            w32_user_path = str8_from_str16(w32_perm_arena, str16_cstring(buffer));
         }
     }
     
     // temp data
     {
         DWORD cap = 2048;
-        U16 *buffer = push_array(scratch, U16, cap);
+        U16 *buffer = push_array(scratch.arena, U16, cap);
         DWORD size = GetTempPathW(cap, (WCHAR*)buffer);
         if (size >= cap){
-            scratch.reset();
-            buffer = push_array(scratch, U16, size + 1);
+            m_end_temp(scratch);
+            buffer = push_array(scratch.arena, U16, size + 1);
             size = GetTempPathW(size + 1, (WCHAR*)buffer);
         }
         
         // NOTE(allen): size - 1, because this particular string function
         // in the Win32 API is different from the others and it includes 
         // the trailing backslash. We want consistency, so the "- 1" removes it.
-        w32_temp_path = str8_from_str16(&w32_perm_arena, str16(buffer, size - 1));
+        w32_temp_path = str8_from_str16(w32_perm_arena, str16(buffer, size - 1));
     }
+    
+    m_release_scratch(scratch);
 }
 
 function void
-w32_WinMain_init(OS_ThreadContext *tctx_memory,
-                 HINSTANCE hInstance,
+w32_WinMain_init(HINSTANCE hInstance,
                  HINSTANCE hPrevInstance,
                  LPSTR     lpCmdLine,
                  int       nShowCmd){
     int argc = __argc;
     char **argv = __argv;
-    os_main_init(tctx_memory, argc, argv);
+    os_main_init(argc, argv);
 }
 
 function String8List
@@ -129,9 +123,10 @@ os_memory_reserve(U64 size){
     return(result);
 }
 
-function void
+function B32
 os_memory_commit(void *ptr, U64 size){
-    VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE);
+    B32 result = (VirtualAlloc(ptr, size, MEM_COMMIT, PAGE_READWRITE) != 0);
+    return(result);
 }
 
 function void
@@ -142,20 +137,6 @@ os_memory_decommit(void *ptr, U64 size){
 function void
 os_memory_release(void *ptr, U64 size){
     VirtualFree(ptr, 0, MEM_RELEASE);
-}
-
-////////////////////////////////
-// NOTE(allen): Thread Context
-
-function void
-os_thread_context_set(void *ptr){
-    TlsSetValue(w32_thread_context_index, ptr);
-}
-
-function void*
-os_thread_context_get(void){
-    void *result = TlsGetValue(w32_thread_context_index);
-    return(result);
 }
 
 ////////////////////////////////
@@ -220,8 +201,8 @@ w32_access_from_attributes(DWORD attribs){
 function String8
 os_file_read(M_Arena *arena, String8 file_name){
     // get handle
-    M_Scratch scratch(arena);
-    String16 file_name16 = str16_from_str8(scratch, file_name);
+    M_ArenaTemp scratch = m_get_scratch(&arena, 1);
+    String16 file_name16 = str16_from_str8(scratch.arena, file_name);
     HANDLE file = CreateFileW((WCHAR*)file_name16.str,
                               GENERIC_READ, 0, 0,
                               OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL,
@@ -235,7 +216,7 @@ os_file_read(M_Arena *arena, String8 file_name){
         U64 total_size = (((U64)hi_size) << 32) | (U64)lo_size;
         
         // allocate buffer
-        M_Temp restore_point = m_begin_temp(arena);
+        M_ArenaTemp restore_point = m_begin_temp(arena);
         U8 *buffer = push_array(arena, U8, total_size);
         
         // read
@@ -268,14 +249,16 @@ os_file_read(M_Arena *arena, String8 file_name){
         CloseHandle(file);
     }
     
+    m_release_scratch(scratch);
+    
     return(result);
 }
 
 function B32
 os_file_write(String8 file_name, String8List data){
     // get handle
-    M_Scratch scratch;
-    String16 file_name16 = str16_from_str8(scratch, file_name);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 file_name16 = str16_from_str8(scratch.arena, file_name);
     HANDLE file = CreateFileW((WCHAR*)file_name16.str,
                               GENERIC_WRITE, 0, 0,
                               CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL,
@@ -309,14 +292,16 @@ os_file_write(String8 file_name, String8List data){
         CloseHandle(file);
     }
     
+    m_release_scratch(scratch);
+    
     return(result);
 }
 
 function FileProperties
 os_file_properties(String8 file_name){
     // convert name
-    M_Scratch scratch;
-    String16 file_name16 = str16_from_str8(scratch, file_name);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 file_name16 = str16_from_str8(scratch.arena, file_name);
     
     // get attribs and convert to properties
     FileProperties result = {};
@@ -330,47 +315,53 @@ os_file_properties(String8 file_name){
         result.access = w32_access_from_attributes(attribs.dwFileAttributes);
     }
     
+    m_release_scratch(scratch);
+    
     return(result);
 }
 
 function B32
 os_file_delete(String8 file_name){
     // convert name
-    M_Scratch scratch;
-    String16 file_name16 = str16_from_str8(scratch, file_name);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 file_name16 = str16_from_str8(scratch.arena, file_name);
     // delete file
     B32 result = DeleteFileW((WCHAR*)file_name16.str);
+    m_release_scratch(scratch);
     return(result);
 }
 
 function B32
 os_file_rename(String8 og_name, String8 new_name){
     // convert name
-    M_Scratch scratch;
-    String16 og_name16 = str16_from_str8(scratch, og_name);
-    String16 new_name16 = str16_from_str8(scratch, new_name);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 og_name16 = str16_from_str8(scratch.arena, og_name);
+    String16 new_name16 = str16_from_str8(scratch.arena, new_name);
     // rename file
     B32 result = MoveFileW((WCHAR*)og_name16.str, (WCHAR*)new_name16.str);
+    m_release_scratch(scratch);
     return(result);
 }
 
 function B32
 os_file_make_directory(String8 path){
     // convert name
-    M_Scratch scratch;
-    String16 path16 = str16_from_str8(scratch, path);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 path16 = str16_from_str8(scratch.arena, path);
     // make directory
     B32 result = CreateDirectoryW((WCHAR*)path16.str, 0);
+    m_release_scratch(scratch);
     return(result);
 }
 
 function B32
 os_file_delete_directory(String8 path){
     // convert name
-    M_Scratch scratch;
-    String16 path16 = str16_from_str8(scratch, path);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 path16 = str16_from_str8(scratch.arena, path);
     // make directory
     B32 result = RemoveDirectoryW((WCHAR*)path16.str);
+    m_release_scratch(scratch);
     return(result);
 }
 
@@ -382,15 +373,16 @@ os_file_iter_init(String8 path){
     String8List list = {};
     str8_list_push_explicit(&list, path, nodes + 0);
     str8_list_push_explicit(&list, str8_lit("\\*"), nodes + 1);
-    M_Scratch scratch;
-    String8 path_star = str8_join(scratch, &list, 0);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String8 path_star = str8_join(scratch.arena, &list, 0);
     // TODO(allen): make unicode conversions take string lists.
-    String16 path16 = str16_from_str8(scratch, path_star);
+    String16 path16 = str16_from_str8(scratch.arena, path_star);
     
     // store into iter
     OS_FileIter result = {};
     W32_FileIter *w32_iter = (W32_FileIter*)&result;
     w32_iter->handle = FindFirstFileW((WCHAR*)path16.str, &w32_iter->find_data);
+    m_release_scratch(scratch);
     return(result);
 }
 
@@ -454,16 +446,17 @@ os_file_path(M_Arena *arena, OS_SystemPath path){
     switch (path){
         case OS_SystemPath_CurrentDirectory:
         {
-            M_Scratch scratch(arena);
+            M_ArenaTemp scratch = m_get_scratch(&arena, 1);
             DWORD cap = 2048;
-            U16 *buffer = push_array(scratch, U16, cap);
+            U16 *buffer = push_array(scratch.arena, U16, cap);
             DWORD size = GetCurrentDirectoryW(cap, (WCHAR*)buffer);
             if (size >= cap){
-                scratch.reset();
-                buffer = push_array(scratch, U16, size + 1);
+                m_end_temp(scratch);
+                buffer = push_array(scratch.arena, U16, size + 1);
                 size = GetCurrentDirectoryW(size + 1, (WCHAR*)buffer);
             }
             result = str8_from_str16(arena, str16(buffer, size));
+            m_release_scratch(scratch);
         }break;
         
         case OS_SystemPath_Binary:
@@ -545,9 +538,10 @@ os_sleep_milliseconds(U32 t){
 function OS_Library
 os_lib_load(String8 path){
     OS_Library result = {};
-    M_Scratch scratch;
-    String16 path16 = str16_from_str8(scratch, path);
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    String16 path16 = str16_from_str8(scratch.arena, path);
     result.v[0] = (U64)(LoadLibraryW((WCHAR*)path16.str));
+    m_release_scratch(scratch);
     return(result);
 }
 

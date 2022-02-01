@@ -173,6 +173,14 @@
 #define local  static
 #define function static
 
+#if COMPILER_CL
+# define threadvar __declspec(thread)
+#elif COMPILER_CLANG
+# define threadvar __thread
+#else
+# error threadvar defined for this compiler
+#endif
+
 #define c_linkage_begin extern "C"{
 #define c_linkage_end   }
 #define c_linkage extern "C"
@@ -215,13 +223,15 @@ Min(sizeof(*(d)),sizeof(*(s)))*(c))
 
 #define DLLPushFront(f,l,n) DLLPushBack_NP(l,f,n,prev,next)
 
-#define DLLRemove_NP(f,l,n,next,prev) (((f)==(n)?\
-((f)=(f)->next,(f)->prev=0):\
+#define DLLRemove_NP(f,l,n,next,prev) ((f)==(n)?\
+((f)==(l)?\
+((f)=(l)=(0)):\
+((f)=(f)->next,(f)->prev=0)):\
 (l)==(n)?\
 ((l)=(l)->prev,(l)->next=0):\
 ((n)->next->prev=(n)->prev,\
-(n)->prev->next=(n)->next)))
-#define DLLRemove(f,l,n) DLLRemove(f,l,n,next,prev)
+(n)->prev->next=(n)->next))
+#define DLLRemove(f,l,n) DLLRemove_NP(f,l,n,next,prev)
 
 #define SLLQueuePush_N(f,l,n,next) ((f)==0?\
 (f)=(l)=(n):\

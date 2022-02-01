@@ -345,11 +345,12 @@ str_decode_utf8(U8 *str, U32 cap){
         if (0 < l && l <= cap){
             U32 cp = (byte & first_byte_mask[l]) << 18;
             switch (l){
-                case 3: cp |= ((str[3] & 0x3F) << 0);
-                case 2: cp |= ((str[2] & 0x3F) << 6);
-                case 1: cp |= ((str[1] & 0x3F) << 12);
-                case 0: cp >>= final_shift[l];
+                case 4: cp |= ((str[3] & 0x3F) << 0);
+                case 3: cp |= ((str[2] & 0x3F) << 6);
+                case 2: cp |= ((str[1] & 0x3F) << 12);
+                default: break;
             }
+            cp >>= final_shift[l];
             
             result.codepoint = cp;
             result.size = l;

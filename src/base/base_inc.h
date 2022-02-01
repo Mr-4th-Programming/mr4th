@@ -7,6 +7,7 @@
 // NOTE(allen): All The Base .h Files
 
 #include "base_types.h"
+#include "base_default_memory.h"
 #include "base_memory.h"
 #include "base_string.h"
 #include "base_buffer_ops.h"

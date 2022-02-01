@@ -99,7 +99,7 @@ audgen_high_pass_in_place(AUDGEN_Buffer buf, I1F32 range_t, F32 cutoff_freq){
         F32 prev_v = *ptr;
         F32 prev_w = prev_v;
         ptr += 1;
-        for (U64 i = range_i.min + 1; i < range_i.max; i += 1){
+        for (U64 i = range_i.min + 1; i < range_i.max; i += 1, ptr += 1){
             F32 w = *ptr;
             F32 v = alpha*(prev_v + w - prev_w);
             *ptr = v;

@@ -4,18 +4,6 @@
 #define OS_ESSENTIAL_H
 
 ////////////////////////////////
-// NOTE(allen): Thread Context
-
-#if !defined(OS_SCRATCH_POOL_CAP)
-# define OS_SCRATCH_POOL_CAP 4
-#endif
-
-struct OS_ThreadContext{
-    M_BaseMemory *memory;
-    M_Arena scratch_pool[OS_SCRATCH_POOL_CAP];
-};
-
-////////////////////////////////
 // NOTE(allen): File Iterator
 
 struct OS_FileIter{
@@ -43,7 +31,7 @@ struct OS_Library{
 ////////////////////////////////
 // NOTE(allen): Setup
 
-function void os_main_init(OS_ThreadContext *tctx_memory, int argc, char **argv);
+function void os_main_init(int argc, char **argv);
 
 function String8List os_command_line_arguments(void);
 
@@ -51,15 +39,9 @@ function String8List os_command_line_arguments(void);
 // NOTE(allen): Memory Functions
 
 function void* os_memory_reserve(U64 size);
-function void  os_memory_commit(void *ptr, U64 size);
+function B32   os_memory_commit(void *ptr, U64 size);
 function void  os_memory_decommit(void *ptr, U64 size);
 function void  os_memory_release(void *ptr, U64 size);
-
-////////////////////////////////
-// NOTE(allen): Thread Context
-
-function void  os_thread_context_set(void *ptr);
-function void* os_thread_context_get(void);
 
 ////////////////////////////////
 // NOTE(allen): File Handling

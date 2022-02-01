@@ -25,8 +25,7 @@ StaticAssert(sizeof(W32_FileIter) <= sizeof(OS_FileIter), w32_fileiter);
 ////////////////////////////////
 // NOTE(allen): WinMain Specialized Init
 
-function void w32_WinMain_init(OS_ThreadContext *tctx_memory,
-                               HINSTANCE hInstance,
+function void w32_WinMain_init(HINSTANCE hInstance,
                                HINSTANCE hPrevInstance,
                                LPSTR     lpCmdLine,
                                int       nShowCmd);

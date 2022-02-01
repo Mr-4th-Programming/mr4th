@@ -22,9 +22,10 @@
 // NOTE(allen): Main
 
 int main(int argc, char **argv){
-    OS_ThreadContext tctx_memory = {};
-    os_main_init(&tctx_memory, argc, argv);
+    os_main_init(argc, argv);
     
-    M_Scratch scratch;
+    M_ArenaTemp scratch = m_get_scratch(0, 0);
+    
+    m_release_scratch(scratch);
 }
 

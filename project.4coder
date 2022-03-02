@@ -40,10 +40,18 @@ commands = {
    .win = "pushd build & play_temp_wave",
    .linux = "build/play_temp_wave",
    .mac = "build/play_temp_wave", },
+
+ .build_euler = { .out = "*compilation*", .footer_panel = true, .save_dirty_files = true,
+   .win = "git_bash bin/build_euler.sh",
+   .linux = "bin/build_euler.sh",
+   .mac = "bin/build_euler.sh", },
+ .run_euler = { .out = "*run*", .footer_panel = false, .save_dirty_files = false,
+   .win = "pushd build & euler",
+   .linux = "build/euler",
+   .mac = "build/euler", },
 };
 
 fkey_command = {
- .F1 = "build",
- .F2 = "run",
- .F5 = "run_play_temp_wave",
+ .F1 = "build_euler",
+ .F2 = "run_euler",
 };

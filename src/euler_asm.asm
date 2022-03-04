@@ -17,32 +17,25 @@ fibonacci_stepper_mul PROC
   mov rax, [rcx]
   imul rax, [rdx]
   
-  ; r8 = n1*k2
-  mov r8, [rcx]
+  ; r8 = n2*k2
+  mov r8, [rcx + 8]
   imul r8, [rdx + 8]
   
-  ; r9 = n2*k2
-  mov r9, [rcx + 8]
+  ; r9 = n1*k2
+  mov r9, [rcx]
   imul r9, [rdx + 8]
   
-  ; p1 = n1*k1 + n2*k2 = (rax + r9)
+  ; p1 = n1*k1 + n2*k2 = (rax + r8)
   mov [rcx], rax
-  add [rcx], r9
+  add [rcx], r8
   
-  ; rax = n3*k3
-  mov rax, [rcx + 16]
-  imul rax, [rdx + 16]
+  ; rax = n2*(k1 + k2)
+  mov rax, [rdx]
+  add rax, [rdx + 8]
+  imul rax, [rcx + 8]
   
-  ; p3 = n2*k2 + n3*k3 = (r9 + rax)
-  mov [rcx + 16], r9
-  add [rcx + 16], rax
-  
-  ; rax = n2*k3
-  mov rax, [rcx + 8]
-  imul rax, [rdx + 16]
-  
-  ; p2 = n1*k2 + n2*k3 = (r8 + rax)
-  mov [rcx + 8], r8
+  ; p2 = n1*k2 + n2*(k1 + k2) = (r9 + rax)
+  mov [rcx + 8], r9
   add [rcx + 8], rax
   
   ret
@@ -50,43 +43,31 @@ fibonacci_stepper_mul ENDP
 
 ; rcx - dst
 fibonacci_stepper_sqr PROC
-  ; rax = n1 + n3
-  mov rax, [rcx]
-  add rax, [rcx + 16]
-  
-  ; rax = n2*(n1 + n3), rdx = n2*n2
-  mov rdx, [rcx + 8]
-  imul rax, rdx
-  imul rdx, rdx
-  
-  ; p2 = n2*(n1 + n3) = rax
-  mov [rcx + 8], rax
+  mov rax, [rcx]    ; rax = n1
+  mov r8, [rcx + 8] ; r8  = n2
+  mov r9, rax
+  imul r9, r8       ; r9  = n1*n2
+  imul rax, rax     ; rax = n1*n1
+  imul r8, r8       ; r8  = n2*n2
   
   ; p1 = n1*n1 + n2*n2
-  mov rax, [rcx]
-  imul rax, rax
-  add rax, rdx
+  add rax, r8       ; rax = n1*n1 + n2*n2
   mov [rcx], rax
   
-  ; p3 = n3*n3 + n2*n2
-  mov rax, [rcx + 16]
-  imul rax, rax
-  add rax, rdx
-  mov [rcx + 16], rax
-  
+  ; p2 = 2*n1*n2 + n2*n2
+  lea rax, [r8 + r9*2]       ; rax = 2*n1*n2 + n2*n2
+  mov [rcx + 8], rax
   ret  
 fibonacci_stepper_sqr ENDP
 
 ; rcx - n
 fibonacci_number PROC
   push rsi
-  sub rsp, 48
-  mov qword ptr [rsp],      1 ; a = [1, 0, 1]
+  sub rsp, 32
+  mov qword ptr [rsp],      1 ; a = [1, 0]
   mov qword ptr [rsp + 8],  0
-  mov qword ptr [rsp + 16], 1
-  mov qword ptr [rsp + 24], 0 ; s = [0, 1, 1]
-  mov qword ptr [rsp + 32], 1
-  mov qword ptr [rsp + 40], 1
+  mov qword ptr [rsp + 16], 0 ; s = [0, 1]
+  mov qword ptr [rsp + 24], 1
   
   ; relocate n
   mov rsi, rcx
@@ -102,7 +83,7 @@ loop0:
   
   ; mul(a,s)
   mov rcx, rsp
-  lea rdx, [rsp + 24]
+  lea rdx, [rsp + 16]
   call fibonacci_stepper_mul
   
 skip_accumulator:
@@ -113,7 +94,7 @@ skip_accumulator:
   jz done
   
   ; sqr(s)
-  lea rcx, [rsp + 24]
+  lea rcx, [rsp + 16]
   call fibonacci_stepper_sqr
   
   ; goto loop0;
@@ -121,7 +102,7 @@ skip_accumulator:
   
 done:
   mov rax, [rsp + 8]
-  add rsp, 48
+  add rsp, 32
   pop rsi
   ret
 fibonacci_number ENDP
@@ -135,32 +116,70 @@ fibonacci_sigma PROC
   ret
 fibonacci_sigma ENDP
 
-euler2 PROC
-  ret
-euler2 ENDP
 
-; 3*TRI(999/3) + 5*TRI(999/5) - 15*TRI(999/15)
-euler1 PROC
-  sub rsp, 8
-  ; 3 part
-  mov rcx, 333        ; rcx = floor(999/3)
-  call triangle_number; rax = tri(999/3)
-  imul rax, 3         ; rax = 3*tri(999/3)
-  mov [rsp], rax      ; [rsp] = 3*tri(999/3)
-  ; 5 part
-  mov rcx, 199        ; rcx = floor(999/5)
-  call triangle_number; rax = tri(999/5)
-  imul rax, 5         ; rax = 5*tri(999/5)
-  add [rsp], rax      ; [rsp] = 3*tri(999/3) + 5*tri(999/5)
-  ; 15 part
-  mov rcx, 66         ; rcx = floor(999/15)
-  call triangle_number; rax = tri(999/15)
-  imul rax, 15        ; rax = 15*tri(999/15)
-  sub [rsp], rax      ; [rsp] = 3*tri(999/3) + 5*tri(999/5) - 15*tri(999/15)
-  mov rax, [rsp]
-  add rsp, 8
+; rcx - table_memory
+; rdx - primes_list
+; r8d - max_value
+;  assumptions:
+;   r8d > 2
+;   rcx points to r8d available bytes, cleared to zero
+;   rdx points to 8*r8d available bytes
+prime_sieve__asm PROC
+  ; r8 = (r8d - 3)/2
+  sub r8, 3
+  shr r8, 1
+  
+  ; emit 2
+  mov dword ptr [rdx],2
+  mov rax,1
+  
+  ; r9=0
+  xor r9,r9
+  
+loop0:
+  
+  ; r10 = table_memory[r9]
+  movzx r10, byte ptr [rcx + r9]
+  
+  ; if (r10 != 0) goto next;
+  test r10,r10
+  jnz next
+  
+  ; r10 = 3 + r9*2
+  lea r10, [3 + r9*2]
+  
+  ; emit r10
+  mov dword ptr [rdx + rax*4],r10d
+  inc rax
+  
+  ; r11 = (r10*r10 - 3)/2
+  mov r11, r10
+  imul r11, r11
+  sub r11, 3
+  shr r11, 1
+  
+  ; if (r11 > r8) goto next;
+  cmp r11,r8
+  jg next
+  
+loop1:
+  ; table_memory[r11] = 1
+  mov byte ptr [rcx + r11], 1
+  
+  ; r11 += r10
+  add r11, r10
+  ; if (r11 <= r8) goto loop1;
+  cmp r11,r8
+  jle loop1
+  
+next:
+  ; r9 += 1
+  inc r9
+  ; if (r9 <= r8) goto loop0;
+  cmp r9,r8
+  jle loop0
+  
   ret
-euler1 ENDP
-
+prime_sieve__asm ENDP
 
 END

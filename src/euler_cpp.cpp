@@ -9,6 +9,7 @@
 // NOTE(allen): Assembly Function Declarations
 
 c_linkage U64 triangle_number(U64 n);
+c_linkage U64 sum_of_squares(U64 n);
 
 c_linkage void fibonacci_stepper_mul(void *dst, void *src);
 c_linkage void fibonacci_stepper_sqr(void *dst);
@@ -18,6 +19,16 @@ c_linkage U64 fibonacci_sigma(U64 n);
 c_linkage U32 prime_sieve__asm(B8 *table_memory,
                                U32 *primes_list,
                                U32 max_value);
+
+struct Pair_U64{
+  U64 a;
+  U64 b;
+};
+
+c_linkage Pair_U64 find_bounded_factors(U64 min, U64 max, U64 traget_product);
+
+c_linkage U64 gcd_euclidean(U64 a, U64 b);
+c_linkage U64 lcm_euclidean(U64 a, U64 b);
 
 ////////////////////////////////
 // NOTE(allen): Helpers/Wrappers with C/C++ Niceness
@@ -53,7 +64,8 @@ int
 main(void){
   M_Arena *arena = m_alloc_arena();
   
-  U64 answer = 0;
+  U64 tri = triangle_number(100);
+  U64 answer = tri*tri - sum_of_squares(100);
   printf("%llu\n", answer);
   
   return(0);

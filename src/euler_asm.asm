@@ -1,4 +1,6 @@
 
+; TODO: above/below for unsigned integers
+
 .code
 
 ; rcx - n
@@ -141,69 +143,389 @@ fibonacci_sigma ENDP
 
 
 ; rcx - table_memory
-; rdx - primes_list
-; r8d - max_value
-;  assumptions:
-;   r8d > 2
-;   rcx points to r8d available bytes, cleared to zero
-;   rdx points to 8*r8d available bytes
+; rdx - primes_list (TODO: edx?)
+; r8d - first       (TODO: r8d?)
+; r9d - opl         (TODO: r9d?)
+; [rsp + 0x28] - node
 prime_sieve__asm PROC
-  ; r8 = (r8d - 3)/2
-  sub r8, 3
-  shr r8, 1
+  push r15
+  push r14
+  push r13
+  push r12
+  sub rsp,16
+  
+  ; save primes list at [rsp]
+  mov [rsp],rdx
+  
+  ; save counter at [rsp + 1]
+  mov qword ptr [rsp+8],0
+  
+  ; move node to r15
+  mov r15, [rsp + 58h]
+  
+  ; if (node != 0) goto skip_emit_2;
+  test r15,r15
+  jnz skip_emit_2;
   
   ; emit 2
   mov dword ptr [rdx],2
-  mov rax,1
+  mov qword ptr [rsp+8],1
+skip_emit_2:
   
-  ; r9=0
+  ; M' = (first even)?(first + 1):(first);
+  or r8d,1
+  
+  ; move opl into r12
+  mov r12,r9
+  
+  ; ibound = (opl - M' + 1)/2
+  sub r9,r8
+  inc r9
+  shr r9,1
+  
+  ; table_memory_bound = table_memory + ibound
+  mov r13,rcx
+  add r13,r9
+  
+mixing0:
+  ; if (node == 0) goto done_mixing;
+  test r15,r15
+  jz done_mixing
+  
+  ; r14 = node->array.v
+  mov r14, [r15 + 8]
+  ; r10 = node->array.v + node->array.count
+  mov r10, [r15 + 16]
+  lea r10, [r14 + r10*4]
+  
+mixing1:
+  ; if (r14 >= r10) goto mixing0_next;
+  cmp r14,r10
+  jge mixing0_next
+  
+  ; p = *r14
+  mov r11d, [r14]
+  
+  ; if (p == 2) goto mixing1_next;
+  cmp r11,2
+  je mixing1_next;
+  
+  ; if (p*p >= opl) goto done_mixing;
+  mov rax,r11
+  imul rax,rax
+  cmp rax,r12
+  jge done_mixing
+  
+  ; k = floor((M' + p - 1)/p)
+  mov rax,r8
+  add rax,r11
+  dec rax
+  xor rdx,rdx
+  idiv r11
+  
+  ; if (k < p) k = p;
+  cmp rax,r11
+  cmovl rax,r11
+  
+  ; if (k even) k += 1;
+  or rax,1
+  
+  ; x = k*p
+  imul rax,r11
+  
+  ; j = (x - M')/2
+  sub rax,r8
+  shr rax,1
+  
+  ; ptr = table_memory + j
+  add rax, rcx
+  
+mixing2:
+  ; if (ptr >= table_memory_bound) goto mixing1_next;
+  cmp rax,r13
+  jge mixing1_next;
+  
+  ; mark x in the table
+  mov byte ptr [rax],1
+  
+  ; j += p, goto mixing2
+  add rax,r11
+  jmp mixing2
+  
+mixing1_next:
+  ; increment r14
+  add r14,4
+  jmp mixing1
+  
+mixing0_next:
+  ; node = node->next
+  mov r15,[r15]
+  jmp mixing0
+  
+done_mixing:
+  
+  ; retrieve base of primes_list
+  mov rdx,[rsp]
+  
+  ; retrieve counter
+  mov rax,[rsp+8]
+  
+  ; ptr = table_memory
+  mov r12, rcx
+  
+scanning0:
+  ; mark = *ptr
+  movzx r15, byte ptr [r12]
+  
+  ; if (mark != 0) goto scanning0_next;
+  test r15,r15
+  jnz scanning0_next;
+  
+  ; j = ptr - table_memory
+  mov r14, r12
+  sub r14, rcx
+  
+  ; p = M' + 2*j
+  lea r14, [r8 + r14*2]
+  
+  ; emit p
+  mov dword ptr [rdx + rax*4], r14d
+  inc rax
+  
+  ; j' = (p*p - M')/2
+  mov  r10,r14
+  imul r10,r10
+  sub  r10,r8
+  shr  r10,1
+  
+  ; ptr' = table_memory + j'
+  add r10, rcx
+  
+scanning1:
+  ; if (ptr' >= table_memory_bound) goto scanning0_next;
+  cmp r10,r13
+  jge scanning0_next;
+  
+  ; *(ptr') = 1
+  mov byte ptr [r10], 1
+  
+  ; ptr' += p
+  add r10,r14
+  jmp scanning1
+  
+scanning0_next:
+  ; ptr += 1
+  inc r12
+  
+  ; if (ptr < table_memory_bound) goto scanning0;
+  cmp r12,r13
+  jl scanning0
+  
+  add rsp,16
+  pop r12
+  pop r13
+  pop r14
+  pop r15
+  ret
+prime_sieve__asm ENDP
+
+
+
+; rcx - table_memory
+; rdx - count (TODO: edx?)
+;  assumptions:
+;   rcx is a pointer to 4*rdx bytes, cleared to zero
+factorization_table__asm PROC
+  ; i = 0
+  xor rax,rax
+  
+loop0:
+  ; if (i >= count) goto done;
+  cmp rax,rdx
+  jge done
+  
+  ; f = table_memory[i]
+  mov r9d, dword ptr [rcx + rax*4]
+  
+  ; if (f != 0) goto loop0_next
+  test r9,r9
+  jnz loop0_next
+  
+  ; n = 3 + 2*i
+  lea r8, [3 + rax*2]
+  
+  ; table_memory[i] = n
+  mov dword ptr [rcx + rax*4], r8d
+  
+  ; r9 = n*n
+  mov r9,r8
+  imul r9,r9
+  
+  ; j = (n*n - 3)/2
+  sub r9,3
+  shr r9,1
+  
+loop1:
+  ; if (j >= count) goto loop0_next;
+  cmp r9,rdx
+  jge loop0_next
+  
+  ; table_memory[j] = n
+  mov dword ptr [rcx + r9*4], r8d
+  
+  ; increment
+  add r9,r8
+  jmp loop1
+  
+loop0_next:
+  ; increment
+  inc rax
+  jmp loop0
+
+done:
+  ret
+factorization_table__asm ENDP
+
+
+; rcx - fact_tbl
+; rdx - count (TODO: edx?)
+; r8d - n     (TODO: r8d?)
+get_prime_factor PROC
+  ; if (n even) goto return_2;
+  test r8d,1
+  jz return_2
+  
+  ; if (n == 1) goto return_1;
+  cmp r8d,1
+  je return_1
+  
+  ; j = (n - 3)/2
+  sub r8d,3
+  shr r8d,1
+  
+  ; if (j >= count) goto return_0;
+  cmp r8d,edx
+  jge return_0
+  
+  ; f = fact_tbl[j]
+  mov eax, dword ptr [rcx + r8*4]
+  ret
+  
+return_2:
+  mov rax,2
+  ret
+  
+return_1:
+  mov rax,1
+  ret
+  
+return_0:
+  xor rax,rax
+  ret
+get_prime_factor ENDP
+
+
+; ecx - n (TODO: edx)
+; edx - f (TODO: r8d)
+max_divide PROC
+  
+  ; move f into r8
+  mov r8d,edx
+  ; move n into r10
+  mov r10d,ecx
+  ; r = 0
   xor r9,r9
   
 loop0:
+  ; compute n/f and n%f
+  mov rax,r10
+  xor rdx,rdx
+  idiv r8
   
-  ; r10 = table_memory[r9]
-  movzx r10, byte ptr [rcx + r9]
+  ; if ((remainder) != 0) goto done;
+  test rdx,rdx
+  jnz done
   
-  ; if (r10 != 0) goto next;
-  test r10,r10
-  jnz next
-  
-  ; r10 = 3 + r9*2
-  lea r10, [3 + r9*2]
-  
-  ; emit r10
-  mov dword ptr [rdx + rax*4],r10d
-  inc rax
-  
-  ; r11 = (r10*r10 - 3)/2
-  mov r11, r10
-  imul r11, r11
-  sub r11, 3
-  shr r11, 1
-  
-  ; if (r11 > r8) goto next;
-  cmp r11,r8
-  jg next
-  
-loop1:
-  ; table_memory[r11] = 1
-  mov byte ptr [rcx + r11], 1
-  
-  ; r11 += r10
-  add r11, r10
-  ; if (r11 <= r8) goto loop1;
-  cmp r11,r8
-  jle loop1
-  
-next:
-  ; r9 += 1
+  ; r += 1
   inc r9
-  ; if (r9 <= r8) goto loop0;
-  cmp r9,r8
-  jle loop0
   
+  ; n = (quotient)
+  mov r10d,eax
+  
+  jmp loop0
+  
+done:
+  mov rax,r10
+  shl rax,32
+  or  rax,r9
   ret
-prime_sieve__asm ENDP
+max_divide ENDP
+
+
+; rcx - fact_tbl
+; edx - count
+; r8d - n
+divisor_count PROC
+  push rsi
+  push rdi
+  push r12
+  push r13
+  
+  ; move fact_tbl to rsi
+  mov rsi, rcx
+  
+  ; move count to rdi
+  mov edi, edx
+  
+  ; move n to r12
+  mov r12d, r8d
+  
+  ; accum = 1
+  mov r13d,1
+  
+loop0:
+  ; if (n <= 1) goto done;
+  cmp r12d,1
+  jbe done
+  
+  ; call get_prime_factor(fact_tbl, count, n)
+  mov rcx, rsi
+  mov edx, edi
+  mov r8d, r12d
+  call get_prime_factor
+  
+  ; f is in rax
+  
+  ; call max_divide(n, f)
+  mov ecx, r12d
+  mov edx, eax
+  call max_divide
+  
+  ; {r,n'} are in rax
+  
+  ; accum *= (r + 1)
+  mov ecx,eax
+  inc ecx
+  imul r13d,ecx
+  
+  ; n = n'
+  shr rax,32
+  mov r12d,eax
+  
+  jmp loop0
+  
+done:
+  
+  mov rax,r13
+
+  pop r13
+  pop r12
+  pop rdi
+  pop rsi
+  ret
+divisor_count ENDP
+
+
 
 ; rcx - return pointer
 ; rdx - min

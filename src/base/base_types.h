@@ -149,6 +149,8 @@
 #define Member(T,m) (((T*)0)->m)
 #define OffsetOfMember(T,m) IntFromPtr(&Member(T,m))
 
+#define Implies(a,b) (!(a) || (b))
+
 #define Min(a,b) (((a)<(b))?(a):(b))
 #define Max(a,b) (((a)>(b))?(a):(b))
 #define Clamp(a,x,b) (((x)<(a))?(a):\
@@ -318,153 +320,153 @@ global F64 gold_small_F64 = 0.61803398875;
 // NOTE(allen): Symbolic Constants
 
 enum Axis{
-    Axis_X,
-    Axis_Y,
-    Axis_Z,
-    Axis_W
+  Axis_X,
+  Axis_Y,
+  Axis_Z,
+  Axis_W
 };
 
 enum Side{
-    Side_Min,
-    Side_Max
+  Side_Min,
+  Side_Max
 };
 
 enum OperatingSystem{
-    OperatingSystem_Null,
-    OperatingSystem_Windows,
-    OperatingSystem_Linux,
-    OperatingSystem_Mac,
-    OperatingSystem_COUNT
+  OperatingSystem_Null,
+  OperatingSystem_Windows,
+  OperatingSystem_Linux,
+  OperatingSystem_Mac,
+  OperatingSystem_COUNT
 };
 
 enum Architecture{
-    Architecture_Null,
-    Architecture_X64,
-    Architecture_X86,
-    Architecture_Arm,
-    Architecture_Arm64,
-    Architecture_COUNT
+  Architecture_Null,
+  Architecture_X64,
+  Architecture_X86,
+  Architecture_Arm,
+  Architecture_Arm64,
+  Architecture_COUNT
 };
 
 enum Month{
-    Month_Jan,
-    Month_Feb,
-    Month_Mar,
-    Month_Apr,
-    Month_May,
-    Month_Jun,
-    Month_Jul,
-    Month_Aug,
-    Month_Sep,
-    Month_Oct,
-    Month_Nov,
-    Month_Dec
+  Month_Jan,
+  Month_Feb,
+  Month_Mar,
+  Month_Apr,
+  Month_May,
+  Month_Jun,
+  Month_Jul,
+  Month_Aug,
+  Month_Sep,
+  Month_Oct,
+  Month_Nov,
+  Month_Dec
 };
 
 enum DayOfWeek{
-    DayOfWeek_Sunday,
-    DayOfWeek_Monday,
-    DayOfWeek_Tuesday,
-    DayOfWeek_Wednesday,
-    DayOfWeek_Thursday,
-    DayOfWeek_Friday,
-    DayOfWeek_Saturday
+  DayOfWeek_Sunday,
+  DayOfWeek_Monday,
+  DayOfWeek_Tuesday,
+  DayOfWeek_Wednesday,
+  DayOfWeek_Thursday,
+  DayOfWeek_Friday,
+  DayOfWeek_Saturday
 };
 
 ////////////////////////////////
 // NOTE(allen): Compound Types
 
 union V2S32{
-    struct{
-        S32 x;
-        S32 y;
-    };
-    S32 v[2];
+  struct{
+    S32 x;
+    S32 y;
+  };
+  S32 v[2];
 };
 
 union V2F32{
-    struct{
-        F32 x;
-        F32 y;
-    };
-    F32 v[2];
+  struct{
+    F32 x;
+    F32 y;
+  };
+  F32 v[2];
 };
 
 union V3F32{
-    struct{
-        F32 x;
-        F32 y;
-        F32 z;
-    };
-    F32 v[3];
+  struct{
+    F32 x;
+    F32 y;
+    F32 z;
+  };
+  F32 v[3];
 };
 
 union V4F32{
-    struct{
-        F32 x;
-        F32 y;
-        F32 z;
-        F32 w;
-    };
-    F32 v[4];
+  struct{
+    F32 x;
+    F32 y;
+    F32 z;
+    F32 w;
+  };
+  F32 v[4];
 };
 
 union I1F32{
-    struct{
-        F32 min;
-        F32 max;
-    };
-    F32 v[2];
+  struct{
+    F32 min;
+    F32 max;
+  };
+  F32 v[2];
 };
 
 union I1U64{
-    struct{
-        U64 min;
-        U64 max;
-    };
-    struct{
-        U64 first;
-        U64 opl;
-    };
-    U64 v[2];
+  struct{
+    U64 min;
+    U64 max;
+  };
+  struct{
+    U64 first;
+    U64 opl;
+  };
+  U64 v[2];
 };
 
 union I2S32{
-    struct{
-        V2S32 min;
-        V2S32 max;
-    };
-    struct{
-        V2S32 p0;
-        V2S32 p1;
-    };
-    struct{
-        S32 x0;
-        S32 y0;
-        S32 x1;
-        S32 y1;
-    };
-    V2S32 p[2];
-    S32 v[4];
+  struct{
+    V2S32 min;
+    V2S32 max;
+  };
+  struct{
+    V2S32 p0;
+    V2S32 p1;
+  };
+  struct{
+    S32 x0;
+    S32 y0;
+    S32 x1;
+    S32 y1;
+  };
+  V2S32 p[2];
+  S32 v[4];
 };
 
 union I2F32{
-    struct{
-        V2F32 min;
-        V2F32 max;
-    };
-    struct{
-        V2F32 p0;
-        V2F32 p1;
-    };
-    struct{
-        F32 x0;
-        F32 y0;
-        F32 x1;
-        F32 y1;
-    };
-    V2F32 p[2];
-    F32 v[4];
+  struct{
+    V2F32 min;
+    V2F32 max;
+  };
+  struct{
+    V2F32 p0;
+    V2F32 p1;
+  };
+  struct{
+    F32 x0;
+    F32 y0;
+    F32 x1;
+    F32 y1;
+  };
+  V2F32 p[2];
+  F32 v[4];
 };
 
 ////////////////////////////////
@@ -472,9 +474,9 @@ union I2F32{
 
 typedef U32 DataAccessFlags;
 enum{
-    DataAccessFlag_Read    = (1 << 0),
-    DataAccessFlag_Write   = (1 << 1),
-    DataAccessFlag_Execute = (1 << 2),
+  DataAccessFlag_Read    = (1 << 0),
+  DataAccessFlag_Write   = (1 << 1),
+  DataAccessFlag_Execute = (1 << 2),
 };
 
 ////////////////////////////////
@@ -483,13 +485,13 @@ enum{
 typedef U64 DenseTime;
 
 struct DateTime{
-    U16 msec; // [0,999]
-    U8 sec;   // [0,60]
-    U8 min;   // [0,59]
-    U8 hour;  // [0,23]
-    U8 day;   // [1,31]
-    U8 mon;   // [1,12]
-    S16 year; // 1 = 1 CE; 2020 = 2020 CE; 0 = 1 BCE; -100 = 101 BCE; etc.
+  U16 msec; // [0,999]
+  U8 sec;   // [0,60]
+  U8 min;   // [0,59]
+  U8 hour;  // [0,23]
+  U8 day;   // [1,31]
+  U8 mon;   // [1,12]
+  S16 year; // 1 = 1 CE; 2020 = 2020 CE; 0 = 1 BCE; -100 = 101 BCE; etc.
 };
 
 ////////////////////////////////
@@ -497,15 +499,15 @@ struct DateTime{
 
 typedef U32 FilePropertyFlags;
 enum{
-    FilePropertyFlag_IsFolder = (1 << 0),
+  FilePropertyFlag_IsFolder = (1 << 0),
 };
 
 struct FileProperties{
-    U64 size;
-    FilePropertyFlags flags;
-    DenseTime create_time;
-    DenseTime modify_time;
-    DataAccessFlags access;
+  U64 size;
+  FilePropertyFlags flags;
+  DenseTime create_time;
+  DenseTime modify_time;
+  DataAccessFlags access;
 };
 
 ////////////////////////////////

@@ -685,4 +685,177 @@ lcm_euclidean PROC
 lcm_euclidean ENDP
 
 
+; rcx - return pointer (pointer to EulerData)
+; rdx - text (pointer to String8)
+; r8  - out (ptr)
+euler_data_from_text__asm PROC
+  sub rsp,8
+  
+  ; store og return pointer for later
+  mov [rsp],rcx
+  
+  ; result.v = out
+  mov [rcx],r8
+  
+  ; ptr = text.str
+  mov rax,[rdx]
+  
+  ; opl = ptr + text.size
+  mov rdx,[rdx + 8]
+  lea rdx,[rax + rdx]
+  
+  ; line_count = 0
+  xor r10,r10
+  
+loop0:
+  ; if (ptr >= opl) goto done0;
+  cmp rax,rdx
+  jae done0
+  
+  ; c = *ptr
+  movzx rcx, byte ptr [rax]
+  
+  ; if (c == '\n') goto inc_line_counter;
+  cmp rcx,0ah
+  je inc_line_counter
+  
+  ; d = c - '0'
+  sub rcx,'0'
+  
+  ; if (d <= 9) goto process_digit;
+  cmp rcx,9
+  jbe process_digit
+  
+  jmp loop0_next 
+  
+inc_line_counter:
+  ; line_count += 1
+  inc r10
+  jmp loop0_next
+  
+process_digit:
+  ; *out_ptr = d, out_ptr += 1
+  mov [r8],rcx
+  inc r8
+  
+loop0_next:
+  ; increment (ptr += 1, goto loop0)
+  inc rax
+  jmp loop0
+  
+done0:
+  
+  mov rax,[rsp]
+  
+  ; result.count = out_ptr - out;
+  mov rdx,[rax]
+  sub r8,rdx
+  mov [rax + 8],r8
+  
+  ; result.line_count = line_count;
+  mov [rax + 16],r10
+  
+  add rsp,8
+  ret
+euler_data_from_text__asm ENDP
+
+
+; rcx - return pointer (pointer to EulerData)
+; rdx - text (pointer to String8)
+; r8  - out (ptr)
+euler_data_from_text_2dig__asm PROC
+  sub rsp,8
+  
+  ; store og return pointer for later
+  mov [rsp],rcx
+  
+  ; result.v = out
+  mov [rcx],r8
+  
+  ; ptr = text.str
+  mov rax,[rdx]
+  
+  ; opl = ptr + text.size
+  mov rdx,[rdx + 8]
+  lea rdx,[rax + rdx]
+  
+  ; line_count = 0
+  xor r10,r10
+  
+  ; dig_count = 0
+  xor r9,r9
+  
+  ; accum = 0
+  xor r11,r11
+  
+loop0:
+  ; if (ptr >= opl) goto done0;
+  cmp rax,rdx
+  jae done0
+  
+  ; c = *ptr
+  movzx rcx, byte ptr [rax]
+  
+  ; if (c == '\n') goto inc_line_counter;
+  cmp rcx,0ah
+  je inc_line_counter
+  
+  ; d = c - '0'
+  sub rcx,'0'
+  
+  ; if (d <= 9) goto process_digit;
+  cmp rcx,9
+  jbe process_digit
+  
+  jmp loop0_next 
+  
+inc_line_counter:
+  ; line_count += 1
+  inc r10
+  jmp loop0_next
+  
+process_digit:
+  ; accum *= 10
+  imul r11,10
+  
+  ; accum += d
+  add r11,rcx
+  
+  ; dig_count += 1
+  inc r9
+  
+  ; if (dig_count != 2) goto loop0_next
+  cmp r9,2
+  jne loop0_next
+  
+  ; *out_ptr = accum, out_ptr += 1
+  mov [r8],r11
+  inc r8
+  
+  ; accum = 0, dig_count = 0
+  xor r11,r11
+  xor r9,r9
+  
+loop0_next:
+  ; increment (ptr += 1, goto loop0)
+  inc rax
+  jmp loop0
+  
+done0:
+  
+  mov rax,[rsp]
+  
+  ; result.count = out_ptr - out;
+  mov rdx,[rax]
+  sub r8,rdx
+  mov [rax + 8],r8
+  
+  ; result.line_count = line_count;
+  mov [rax + 16],r10
+  
+  add rsp,8
+  ret
+euler_data_from_text_2dig__asm ENDP
+
+
 END

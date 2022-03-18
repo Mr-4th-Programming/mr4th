@@ -857,5 +857,341 @@ done0:
   ret
 euler_data_from_text_2dig__asm ENDP
 
+; rcx - result pointer (U64x3 pointer)
+; rdx - a (U64x3 pointer)
+; r8  - b (U64x3 pointer)
+add_u64x3 PROC
+  ; c0,r0 = a0 + b0
+  xor r9,r9
+  mov rax, qword ptr [rdx]
+  add rax, qword ptr [r8]
+  setc r9b
+  
+  ; result[0] = r0
+  mov qword ptr [rcx], rax
+  
+  ; /c1,/r1 = a1 + b1
+  xor r10,r10
+  mov rax, qword ptr [rdx + 8]
+  add rax, qword ptr [r8 + 8]
+  setc r10b
+  
+  ; ^c1,r1 = /r1 + c0
+  xor r11,r11
+  add rax, r9
+  setc r11b
+  
+  ; result[1] = r1
+  mov qword ptr [rcx + 8], rax
+  
+  ; c1 = ^c1 | /c1
+  or r10,r11
+  
+  ; /r2 = a2 + b2
+  ; r2 = /r2 + c1
+  mov rax, qword ptr [rdx + 16]
+  add rax, qword ptr [r8 + 16]
+  add rax, r10
+  
+  ; result[2] = r2
+  mov qword ptr [rcx + 16], rax
+  
+  ; return the result pointer
+  mov rax, rcx
+  ret
+add_u64x3 ENDP
+
+; rcx - result pointer (U64x3 pointer)
+; rdx - a (U64x3 pointer)
+; r8  - b (U64)
+add_small_u64x3 PROC
+  ; c0,r0 = a0 + b
+  xor r9,r9
+  mov rax, qword ptr [rdx]
+  add rax, r8
+  setc r9b
+  
+  ; result[0] = r0
+  mov qword ptr [rcx], rax
+  
+  ; /r1 = a1
+  mov rax, qword ptr [rdx + 8]
+  ; r1 = /r1 + c0
+  add rax, r9
+  ; result[1] = r1
+  mov qword ptr [rcx + 8], rax
+  
+  ; result[2] = a2
+  mov rax, qword ptr [rdx + 16]
+  mov qword ptr [rcx + 16], rax
+  
+  ; return the result pointer
+  mov rax, rcx
+  ret
+add_small_u64x3 ENDP
+
+; rcx - result pointer (U64x3 pointer)
+; rdx - a (U64x3 pointer)
+; r8  - b (U64)
+mul_small_u64x3 PROC
+  
+  ; move a to r9
+  mov r9,rdx
+  
+  ; c0,r0 = a0*b (c0:rdx, r0:rax)
+  mov rax, qword ptr [r9]
+  mul r8
+  
+  ; result[0] = r0
+  mov qword ptr [rcx], rax
+  
+  ; move c0 to r10
+  mov r10, rdx
+  
+  ; /c1,/r1 = a1*b (/c1:rdx, /r1:rax)
+  mov rax, qword ptr [r9 + 8]
+  mul r8
+  
+  ; ^c1,r1 = /r1 + c0
+  xor r11,r11
+  add rax,r10
+  setc r11b
+  
+  ; result[1] = r1
+  mov qword ptr [rcx + 8], rax
+  
+  ; c1 = /c1 + ^c1
+  add r11, rdx
+  
+  ; /r2 = a2*b
+  mov rax, qword ptr [r9 + 16]
+  mul r8
+  
+  ; r2 = /r2 + c1
+  add rax,r11
+  
+  ; result[2] = r2
+  mov qword ptr [rcx + 16], rax
+  
+  ; return the result pointer
+  mov rax, rcx
+  ret
+mul_small_u64x3 ENDP
+
+; rcx - result pointer (U64x3_DivR pointer)
+; rdx - n (U64x3 pointer)
+; r8  - d (U64)
+div_small_u64x3 PROC
+  ; move n into r9
+  mov r9,rdx
+  
+  ; (q2,r2) = n2 div d
+  mov rax, qword ptr [r9 + 16]
+  xor rdx,rdx
+  div r8
+  
+  ; result[2] = q2
+  mov qword ptr [rcx + 16], rax
+  
+  ; (q1,r1) = r2:n1 div d
+  mov rax, qword ptr [r9 + 8]
+  ;; note: move r2 into high bits is a noop (rdx->rdx)
+  div r8
+  
+  ; result[1] = q1
+  mov qword ptr [rcx + 8], rax
+  
+  ; (q0,r0) = r1:n0 div d
+  mov rax, qword ptr [r9]
+  ;; note: move r2 into high bits is a noop (rdx->rdx)
+  div r8
+  
+  ; result[0] = q0
+  mov qword ptr [rcx], rax
+  
+  ; result.r = r0
+  mov qword ptr [rcx + 24], rdx
+  
+  ; return the result pointer
+  mov rax,rcx
+  ret
+div_small_u64x3 ENDP
+
+
+; rcx - result pointer (U64x3 pointer)
+; rdx - digits (U8 pointer)
+; r8  - count (U64)
+u64x3_from_dec PROC
+  push r12
+  push r13
+  push r14
+  push rbx
+  
+  ; clear result to zer0
+  mov qword ptr [rcx],0
+  mov qword ptr [rcx + 8],0
+  mov qword ptr [rcx + 16],0
+  
+  ; move result pointer to rbx
+  mov rbx,rcx
+  
+  ; ptr = digits
+  mov r12, rdx
+  
+  ; opl = ptr + count
+  mov r13,r12
+  add r13,r8
+  
+loop0_begin:
+  ; if (ptr >= opl) goto done
+  cmp r12,r13
+  jae done
+  
+  ; x = 0
+  xor r14,r14
+  ; m = 1
+  mov r8,1
+  
+loop0:
+  ; x *= 10, x += *ptr
+  imul r14,10
+  movzx rax, byte ptr [r12]
+  add r14, rax
+  
+  ; m *= 10
+  imul r8,10
+  
+  ; ptr += 1
+  inc r12
+  
+  ; if (m >= 1000000000000000000) goto loop1
+  mov rdx,1000000000000000000
+  cmp r8,rdx
+  jae loop1
+  
+  ; if (ptr >= opl) goto loop1
+  cmp r12,r13
+  jae loop1
+  
+  ; goto loop0
+  jmp loop0
+  
+loop1:
+  ; call mul_small_u64x3(result pointer, result pointer, m)
+  mov rcx,rbx
+  mov rdx,rbx
+  ;mov r8,r8
+  call mul_small_u64x3
+  
+  ; call add_small_u64x3(result pointer, result pointer, x)
+  mov rcx,rbx
+  mov rdx,rbx
+  mov r8,r14
+  call add_small_u64x3
+  
+  jmp loop0_begin
+  
+done:
+  
+  ; return result pointer
+  mov rax, rbx
+  
+  pop rbx
+  pop r14
+  pop r13
+  pop r12
+  ret
+u64x3_from_dec ENDP
+
+
+; rcx - buffer (U8 pointer)
+; rdx - x (U64x3 pointer)
+dec_from_u64x3__asm PROC
+  push r12
+  push r13
+  push r14
+  sub rsp,32
+  
+  ; move buffer into r12
+  mov r12,rcx
+  
+  ; ptr = buffer
+  mov r13,r12
+  
+  ; move x to rsp "by value"
+  mov rax,[rdx]
+  mov [rsp],rax
+  mov rax,[rdx + 8]
+  mov [rsp + 8],rax
+  mov rax,[rdx + 16]
+  mov [rsp + 16],rax
+  
+loop0:
+  
+  ; if (x[0] == 0 && x[1] == 0 && x[2] == 0) goto finish;
+  mov rax,[rsp]
+  test rax,rax
+  jnz done_check
+  mov rax,[rsp + 8]
+  test rax,rax
+  jnz done_check
+  mov rax,[rsp + 16]
+  test rax,rax
+  jz finish
+done_check:
+  
+  ; call div_small_u64x3(div-result, x, 10)
+  mov rcx,rsp
+  mov rdx,rsp
+  mov r8,10
+  call div_small_u64x3
+  
+  ; d = div_result.r
+  mov rcx,[rsp + 24]
+  
+  ; *ptr = d
+  mov byte ptr [r13], cl
+  
+  ; ptr += 1
+  inc r13
+  
+  ; goto loop0
+  jmp loop0
+  
+finish:
+  ; set return value to (ptr - buffer)
+  mov rax,r13
+  sub rax,r12
+  
+  ; ptra: r12, ptrb: r13
+  ; ptrb -= 1
+  dec r13
+reverse_loop:
+  ; if (ptra >= ptrb) goto done
+  cmp r12, r13
+  jae done
+  
+  ; swap
+  mov dl, byte ptr [r12]
+  mov cl, byte ptr [r13]
+  mov byte ptr [r12], cl
+  mov byte ptr [r13], dl
+  
+  ; ptra += 1, ptrb -= 1
+  inc r12
+  dec r13
+  
+  ; goto reverse_loop
+  jmp reverse_loop
+  
+done:
+  
+  add rsp,32
+  pop r14
+  pop r13
+  pop r12
+  ret
+dec_from_u64x3__asm ENDP
+
 
 END

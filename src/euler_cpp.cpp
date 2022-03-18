@@ -13,6 +13,11 @@ struct Array_U32{
   U64 count;
 };
 
+struct Array_U8{
+  U8 *v;
+  U64 count;
+};
+
 struct EulerData{
   U8 *v;
   U64 count;
@@ -39,6 +44,15 @@ struct Pair_U64{
 struct Pair_U32{
   U32 a;
   U32 b;
+};
+
+struct U64x3{
+  U64 v[3];
+};
+
+struct U64x3_DivR{
+  U64x3 q;
+  U64 r;
 };
 
 ////////////////////////////////
@@ -71,8 +85,13 @@ c_linkage U64 lcm_euclidean(U64 a, U64 b);
 c_linkage EulerData euler_data_from_text__asm(String8 text, U8 *memory);
 c_linkage EulerData euler_data_from_text_2dig__asm(String8 text, U8 *memory);
 
-c_linkage U64 euler8__strided(U8 *array, U64 stride, U64 count);
-c_linkage U64 euler11(U8 *array);
+c_linkage U64x3      add_u64x3(U64x3 a, U64x3 b);
+c_linkage U64x3      add_small_u64x3(U64x3 a, U64 b);
+c_linkage U64x3      mul_small_u64x3(U64x3 a, U64 b);
+c_linkage U64x3_DivR div_small_u64x3(U64x3 n, U64 d);
+
+c_linkage U64x3      u64x3_from_dec(U8 *digits, U64 count);
+c_linkage U64        dec_from_u64x3__asm(U8 *out, U64x3 x);
 
 ////////////////////////////////
 // NOTE(allen): Helpers/Wrappers with C/C++ Niceness
@@ -94,6 +113,7 @@ prime_sieve(M_Arena *arena, List_U32 *primes, U32 first, U32 opl){
   
   // put back memory we didn't use in the primes list
   m_arena_pop_amount(arena, sizeof(*primes_list)*(max_count - count));
+  m_arena_align(arena, 8);
   
   // insert new primes block onto the list
   Array_U32 array = {};
@@ -134,6 +154,32 @@ euler_data_from_text(M_Arena *arena, String8 text, U64 num_digits){
     result = euler_data_from_text_2dig__asm(text, memory);
   }
   m_arena_pop_amount(arena, text.size - result.count);
+  m_arena_align(arena, 8);
+  
+  return(result);
+}
+
+c_linkage Array_U8
+dec_from_u64x3(M_Arena *arena, U64x3 x){
+  Array_U8 result = {};
+  
+  if (x.v[0] == 0 && x.v[1] == 0 && x.v[2] == 0){
+    local U8 zbuffer[1] = {0};
+    result.v = zbuffer;
+    result.count = 1;
+  }
+  else{
+    U64 cap = 60;
+    
+    U8 *buffer = push_array(arena, U8, cap);
+    U64 count = dec_from_u64x3__asm(buffer, x);
+    m_arena_pop_amount(arena, cap - count);
+    m_arena_align(arena, 8);
+    
+    result.v = buffer;
+    result.count = count;
+  }
+  
   return(result);
 }
 
@@ -243,11 +289,20 @@ int
 main(void){
   M_Arena *arena = m_alloc_arena();
   
-  String8 text0 = str8_lit(euler11_text);
-  EulerData data = euler_data_from_text(arena, text0, 2);
+  String8 text0 = str8_lit(euler13_text);
+  EulerData data = euler_data_from_text(arena, text0, 1);
   
-  U64 answer = euler11(data.v);
-  fprintf(stdout, "%llu\n", answer);
+  U64x3 x = {0};
+  for (U64 i = 0; i < data.line_count; i += 1){
+    U64x3 c = u64x3_from_dec(data.v + 50*i, 50);
+    x = add_u64x3(x, c);
+  }
+  
+  Array_U8 x_dec = dec_from_u64x3(arena, x);
+  for (U64 i = 0; i < 10; i += 1){
+    fprintf(stdout, "%u", x_dec.v[i]);
+  }
+  fprintf(stdout, "\n");
   
   return(0);
 }

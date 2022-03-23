@@ -141,6 +141,153 @@ fibonacci_sigma PROC
   ret
 fibonacci_sigma ENDP
 
+; rcx - buffer (U64*)
+; rdx - n (U64)
+; r8  - m (U64)
+;  assumptions:
+;   buffer points to at least n + 1 U64s worth of free memory
+;   m <= n
+choose__asm PROC
+  ; m' = n - m
+  mov r9,rdx
+  sub r9,r8
+  
+  ; r = min(m, m'), c = max(m, m')
+  ;  r8 contains, r9 contains c
+  mov rax,r8
+  cmp r8,r9
+  cmova r8,r9
+  cmova r9,rax
+  
+  ; if (r == 0) goto return_1;
+  test r8,r8
+  jz return_1
+  
+  ; if (r == 1) goto return_n;
+  cmp r8,1
+  je return_n
+  
+  ; if (r & 1) goto r_odd_case;
+  test r8,1
+  jnz r_odd_case
+  
+  
+  ;; EVEN CASE ;;
+  ; i = 2
+  mov rax,2
+  
+  ; k = 6
+  mov r11,6
+  
+loop0_even:
+  ; buffer[i] = k
+  mov qword ptr [rcx + rax*8],r11
+  ; i += 1
+  inc rax
+  
+  ; k += i + 1
+  inc r11
+  add r11,rax
+  
+  ; if (i <= c) goto loop0_even;
+  cmp rax,r9
+  jbe loop0_even
+  
+  ; row = 4
+  mov rax,4
+  
+  ; goto loop1
+  jmp loop1
+  
+  
+  ;; ODD CASE ;;
+r_odd_case:
+  ; i = 3
+  mov rax,3
+  
+  ; minor_slot = 10
+  mov rdx,10
+  
+  ; k = 20
+  mov r11,20
+  
+loop0_odd:
+  ; buffer[i] = k
+  mov qword ptr [rcx + rax*8],r11
+  ; i += 1
+  inc rax
+  
+  ; minor_slot += i + 1
+  inc rdx
+  add rdx,rax
+  
+  ; k += minor_slot
+  add r11,rdx
+  
+  ; if (i <= c) goto loop0_odd;
+  cmp rax,r9
+  jbe loop0_odd
+  
+  ; row = 5
+  mov rax,5
+  
+loop1:
+  ; if (row > r) goto return_buffer_c
+  cmp rax,r8
+  ja return_buffer_c
+  
+  ; col = row
+  mov r10,rax
+  
+  ;; initialize the loop
+  mov r11,qword ptr [rcx + r10*8 - 8]
+  shl r11,1
+  add r11,qword ptr [rcx + r10*8]
+  mov rdx,r11
+  shl rdx,1
+  
+  ; buffer[col] = major_slot
+  mov qword ptr [rcx + r10*8],rdx
+  
+loop2:
+  ; col += 1
+  inc r10
+  
+  ; if (col > c) goto loop2_done;
+  cmp r10,r9
+  ja loop2_done
+  
+  ; minor_slot += buffer[col]
+  add r11,qword ptr [rcx + r10*8]
+  ; major_slot += minor_slot
+  add rdx,r11
+  ; buffer[col] = major_slot
+  mov qword ptr [rcx + r10*8],rdx
+  
+  ; goto loop2
+  jmp loop2
+  
+loop2_done:
+  
+  ; row += 2
+  add rax,2
+  
+  ; goto loop1
+  jmp loop1
+  
+return_buffer_c:
+  mov rax,qword ptr [rcx + r9*8]
+  ret
+
+return_1:
+  mov rax,1
+  ret
+  
+return_n:
+  mov rax,rdx
+  ret
+choose__asm ENDP
+
 
 ; rcx - table_memory
 ; rdx - primes_list (TODO: edx?)
@@ -916,13 +1063,18 @@ add_small_u64x3 PROC
   
   ; /r1 = a1
   mov rax, qword ptr [rdx + 8]
-  ; r1 = /r1 + c0
+  ; c1,r1 = /r1 + c0
+  xor r10,r10
   add rax, r9
+  setc r10b
   ; result[1] = r1
   mov qword ptr [rcx + 8], rax
   
-  ; result[2] = a2
+  ; /r2 = a2
   mov rax, qword ptr [rdx + 16]
+  ; r2 = /r2 + c1
+  add rax, r10
+  ; result[2] = r2
   mov qword ptr [rcx + 16], rax
   
   ; return the result pointer
@@ -1192,6 +1344,5 @@ done:
   pop r12
   ret
 dec_from_u64x3__asm ENDP
-
 
 END

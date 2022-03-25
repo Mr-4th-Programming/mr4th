@@ -289,6 +289,36 @@ return_n:
 choose__asm ENDP
 
 
+; rcx - table (U64*)
+; rdx - count (U64)
+fill_factorial_table PROC
+  ; i = 0
+  xor rax,rax
+  ; n = 1
+  mov r8,1
+  
+  ; 
+loop0:
+  ; if (i >= count) goto done
+  cmp rax,rdx
+  jae done
+  
+  ; table[i] = n
+  mov [rcx + rax*8],r8
+  ; i += 1
+  ; n *= i + 1
+  add rax,2
+  imul r8,rax
+  dec rax
+  
+  ; goto loop0
+  jmp loop0
+  
+done:
+  ret
+fill_factorial_table ENDP
+
+
 ; rcx - table_memory
 ; rdx - primes_list (TODO: edx?)
 ; r8d - first       (TODO: r8d?)
@@ -1315,7 +1345,9 @@ finish:
   mov rax,r13
   sub rax,r12
   
-  ; ptra: r12, ptrb: r13
+  ; ptra = ptr
+  ; ptrb = buffer
+  ; (ptra: r12, ptrb: r13)
   ; ptrb -= 1
   dec r13
 reverse_loop:
@@ -1345,4 +1377,295 @@ done:
   ret
 dec_from_u64x3__asm ENDP
 
+; rcx - a (U64xN pointer)
+; rdx - b (U64)
+;  assumption: a has an extra slot of memory available
+mul_small_in_place_u64xn PROC
+  push r12
+  
+  ; move b into r9
+  mov r9,rdx
+  
+  ; f = 0
+  xor r8,r8
+  
+  ; i = 0
+  xor r10,r10
+  
+  ; save a.size in r12
+  mov r12,[rcx]
+  
+loop0:
+  ; if (i >= a.size) goto done
+  cmp r10,r12
+  jae done
+  
+  ; l,h = a[i]*b
+  mov rax, qword ptr [rcx + r10*8 + 8]
+  mul r9
+  
+  ; c,r = l + f
+  xor r11,r11
+  add rax,r8
+  setc r11b
+  
+  ; a[i] = r
+  mov qword ptr [rcx + r10*8 + 8], rax
+  
+  ; f = h + c
+  mov r8,r11
+  add r8,rdx
+  
+  ; i += 1
+  inc r10
+  
+  ; goto loop0
+  jmp loop0
+  
+done:
+  ; if (f == 0) goto return;
+  test r8,r8
+  jz return
+  
+  ; a[a.size] = f
+  mov qword ptr [rcx + r12*8 + 8], r8
+  
+  ; a.size += 1
+  inc r12
+  mov qword ptr [rcx],r12
+  
+return:
+  pop r12
+  ret
+mul_small_in_place_u64xn ENDP
+
+; rcx - n (U64xN pointer)
+; rdx - d (U64)
+div_small_in_place_u64xn PROC
+  ; move d into r8
+  mov r8,rdx
+  
+  ; r = 0
+  xor rdx,rdx
+  
+  ; i = n.size
+  mov r9, qword ptr [rcx]
+  
+loop0:
+  ; if (i == 0) goto done;
+  test r9,r9
+  jz done
+  
+  ; i -= 1
+  dec r9
+  
+  ; q,r = r:n[i] div d
+  mov rax, qword ptr [rcx + r9*8 + 8]
+  div r8
+  
+  ; n[i] = q
+  mov qword ptr [rcx + r9*8 + 8], rax
+  
+  ; goto loop0
+  jmp loop0
+  
+done:
+  
+  ; if (n.size > 0 && n[n.size - 1] == 0) n.size -= 1
+  mov r9, qword ptr [rcx]
+  test r9,r9
+  jz return
+  mov r8, qword ptr [rcx + r9*8]
+  test r8,r8
+  jnz return
+  
+  dec r9
+  mov qword ptr [rcx], r9
+  
+return:
+  ; set result value to last remainder
+  mov rax,rdx
+  ret
+div_small_in_place_u64xn ENDP
+
+; rcx - buffer (U8*)
+; rdx - x (U64xN*) (we're allowed to modify this in place)
+dec_from_u64xn__asm PROC
+  push r12
+  push r13
+  push r14
+  
+  ; move buffer into r12
+  mov r12,rcx
+  
+  ; ptr = buffer
+  mov r13,r12
+  
+  ; move x to r14
+  mov r14,rdx
+  
+loop0:
+  
+  ; if (*x == 0) goto finish;
+  mov rax, qword ptr [r14]
+  test rax,rax
+  jz finish
+  
+  ; call div_small_in_place_u64xn(x, 10)
+  mov rcx,r14
+  mov rdx,10
+  call div_small_in_place_u64xn
+  
+  ; *ptr = remainder
+  mov byte ptr [r13], al
+  
+  ; ptr += 1
+  inc r13
+  
+  ; goto loop0
+  jmp loop0
+  
+  
+finish:
+  ; set return value to (ptr - buffer)
+  mov rax,r13
+  sub rax,r12
+  
+  ; ptra = ptr
+  ; ptrb = buffer
+  ; (ptra: r12, ptrb: r13)
+  
+  ; ptrb -= 1
+  dec r13
+  
+reverse_loop:
+  ; if (ptra >= ptrb) goto done
+  cmp r12, r13
+  jae done
+  
+  ; swap
+  mov dl, byte ptr [r12]
+  mov cl, byte ptr [r13]
+  mov byte ptr [r12], cl
+  mov byte ptr [r13], dl
+  
+  ; ptra += 1, ptrb -= 1
+  inc r12
+  dec r13
+  
+  ; goto reverse_loop
+  jmp reverse_loop
+  
+done:
+  
+  pop r14
+  pop r13
+  pop r12
+  ret
+dec_from_u64xn__asm ENDP
+
+memmove PROTO
+
+; rcx - array (U64*)
+; rdx - index (U64)
+darray_delete PROC
+  ; count = array.count
+  mov rax, qword ptr [rcx - 8]
+  
+  ; if (index >= count) goto skip
+  cmp rdx,rax
+  jae skip
+  
+  ; new_count = count - 1
+  dec rax
+  
+  ; array.count = new_count
+  mov qword ptr [rcx - 8], rax
+  
+  ; move array to r8, index to r9
+  mov r8,rcx
+  mov r9,rdx
+  
+  ; call memmove(rcx + index, rcx + index + 1, (count - index)*8)
+  lea rcx,[r8 + r9*8]
+  lea rdx,[r8 + r9*8 + 8]
+  mov r8,rax
+  sub r8,r9
+  shl r8,3
+  call memmove
+  
+skip:
+  ret
+darray_delete ENDP
+
+
+; rcx - fact_table (U64*)
+; rdx - label_array (U64*)
+; r8  - perm_out (U64*)
+euler24 PROC
+  push r12
+  push r13
+  push r14
+  push r15
+  push rsi
+  
+  ; index = 999999
+  mov r12,999999
+  
+  ; move fact_table into r15
+  mov r15, rcx
+  
+  ; move label_array into r10
+  mov r13,rdx
+  
+  ; move perm_out into rsi
+  mov rsi,r8
+  
+  ; i = 8
+  mov r14,8
+  
+loop0:
+  ; perm_count = fact_table[i]
+  mov r8,qword ptr [r15 + r14*8]
+  
+  ; group_index,new_index = index/perm_count
+  mov rax,r12
+  xor rdx,rdx
+  div r8
+  
+  ; *perm_out = label_array[group_index]
+  mov rcx,qword ptr [r13 + rax*8]
+  mov qword ptr [rsi],rcx
+  
+  ; perm_out += 1
+  add rsi,8
+  
+  ; index = new_index
+  mov r12,rdx
+  
+  ; call darray_delete(label_array, group_index)
+  mov rcx,r13
+  mov rdx,rax
+  call darray_delete
+  
+  ; i -= 1
+  dec r14
+  
+  ; if (i <= 8) goto loop0
+  test r14,8
+  jbe loop0
+  
+  ; *perm_out = label_array[0]
+  mov rcx,qword ptr [r13]
+  mov qword ptr [rsi],rcx
+  
+  pop rsi
+  pop r15
+  pop r14
+  pop r13
+  pop r12
+  ret
+euler24 ENDP
+
 END
+

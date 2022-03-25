@@ -55,6 +55,8 @@ struct U64x3_DivR{
   U64 r;
 };
 
+typedef U64 U64xN;
+
 ////////////////////////////////
 // NOTE(allen): Assembly Function Declarations
 
@@ -67,6 +69,8 @@ c_linkage U64 fibonacci_number(U64 n);
 c_linkage U64 fibonacci_sigma(U64 n);
 
 c_linkage U64 choose__asm(U64 *buffer, U64 n, U64 m);
+
+c_linkage void fill_factorial_table(U64 *table, U64 count);
 
 c_linkage U32 prime_sieve__asm(B8 *table_memory,
                                U32 *primes_list,
@@ -94,6 +98,15 @@ c_linkage U64x3_DivR div_small_u64x3(U64x3 n, U64 d);
 
 c_linkage U64x3      u64x3_from_dec(U8 *digits, U64 count);
 c_linkage U64        dec_from_u64x3__asm(U8 *out, U64x3 x);
+
+c_linkage void mul_small_in_place_u64xn(U64xN *a, U64 b);
+c_linkage U64  div_small_in_place_u64xn(U64xN *n, U64 d);
+
+c_linkage U64 dec_from_u64xn__asm(U8 *out, U64xN *x); // x is "destroyed" by this call
+
+c_linkage void darray_delete(U64 *array, U64 index);
+
+c_linkage U64 euler24(U64 *fact_table, U64 *label_array, U64 *perm_out);
 
 ////////////////////////////////
 // NOTE(allen): Helpers/Wrappers with C/C++ Niceness
@@ -197,22 +210,67 @@ dec_from_u64x3(M_Arena *arena, U64x3 x){
   return(result);
 }
 
+function U64xN*
+copy_u64xn(M_Arena *arena, U64xN *x){
+  U64 size = (*x) + 1;
+  U64xN *result = push_array(arena, U64, size);
+  MemoryCopy(result, x, sizeof(*x)*size);
+  return(result);
+}
+
+function Array_U8
+dec_from_u64xn(M_Arena *arena, U64xN *x){
+  Array_U8 result = {};
+  
+  if (*x == 0){
+    local U8 zbuffer[1] = {0};
+    result.v = zbuffer;
+    result.count = 1;
+  }
+  else{
+    M_ArenaTemp scratch = m_get_scratch(&arena, 1);
+    
+    U64 cap = (*x)*20;
+    
+    U64xN *x_copy = copy_u64xn(scratch.arena, x);
+    
+    U8 *buffer = push_array(arena, U8, cap);
+    U64 count = dec_from_u64xn__asm(buffer, x_copy);
+    m_arena_pop_amount(arena, cap - count);
+    m_arena_align(arena, 8);
+    
+    result.v = buffer;
+    result.count = count;
+    
+    m_release_scratch(scratch);
+  }
+  
+  return(result);
+}
+
 int
 main(void){
   M_Arena *arena = m_alloc_arena();
   
-  for (U64 n = 2; n < 40; n += 1){
-    for (U64 m = 1; m < n; m += 1){
-      U64 a = choose(n - 1, m - 1);
-      U64 b = choose(n - 1, m);
-      U64 c = choose(n, m);
-      
-      Assert(a + b == c);
-    }
+  U64 fact_tbl[10] = {};
+  fill_factorial_table(fact_tbl, 10);
+  
+  U64 label_array[11] = {10};
+  for (U64 i = 0; i < 10; i += 1){
+    label_array[i + 1] = i;
   }
   
-  U64 answer = choose(40,20);
-  fprintf(stdout, "%llu\n", answer);
+  U64 perm[10] = {
+    max_U64, max_U64, max_U64, max_U64, max_U64,
+    max_U64, max_U64, max_U64, max_U64, max_U64,
+  };
+  
+  euler24(fact_tbl, label_array + 1, perm);
+  for (U64 i = 0; i < 10; i += 1){
+    fprintf(stdout, "%llu", perm[i]);
+  }
+  fprintf(stdout, "\n");
+  
   
   return(0);
 }

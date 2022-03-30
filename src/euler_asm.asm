@@ -1,6 +1,4 @@
 
-; TODO: above/below for unsigned integers
-
 .code
 
 ; rcx - n
@@ -86,13 +84,17 @@ fibonacci_stepper_sqr PROC
 fibonacci_stepper_sqr ENDP
 
 ; rcx - n
-fibonacci_number PROC
-  push rsi
-  sub rsp, 32
-  mov qword ptr [rsp],      1 ; a = [1, 0]
-  mov qword ptr [rsp + 8],  0
-  mov qword ptr [rsp + 16], 0 ; s = [0, 1]
-  mov qword ptr [rsp + 24], 1
+fibonacci_number PROC FRAME
+  mov qword ptr [rsp + 8],rsi
+.savereg rsi, 8
+  sub rsp, 64
+.allocstack 64
+.endprolog
+  
+  mov qword ptr [rsp + 32], 1 ; a = [1, 0]
+  mov qword ptr [rsp + 40], 0
+  mov qword ptr [rsp + 48], 0 ; s = [0, 1]
+  mov qword ptr [rsp + 56], 1
   
   ; relocate n
   mov rsi, rcx
@@ -107,8 +109,8 @@ loop0:
   jz skip_accumulator
   
   ; mul(a,s)
-  mov rcx, rsp
-  lea rdx, [rsp + 16]
+  lea rcx, [rsp + 32]
+  lea rdx, [rsp + 48]
   call fibonacci_stepper_mul
   
 skip_accumulator:
@@ -119,25 +121,31 @@ skip_accumulator:
   jz done
   
   ; sqr(s)
-  lea rcx, [rsp + 16]
+  lea rcx, [rsp + 48]
   call fibonacci_stepper_sqr
   
   ; goto loop0;
   jmp loop0
   
 done:
-  mov rax, [rsp + 8]
-  add rsp, 32
-  pop rsi
+  mov rax, [rsp + 40]
+  add rsp, 64
+  mov rsi, qword ptr [rsp + 8]
   ret
 fibonacci_number ENDP
 
 ; rcx - n
 ; fib(n + 2) - 1
-fibonacci_sigma PROC
+fibonacci_sigma PROC FRAME
+  sub rsp,32
+.allocstack 32
+.endprolog
+  
   add rcx, 2
   call fibonacci_number
-  sub rax, 1
+  dec rax
+  
+  add rsp,32
   ret
 fibonacci_sigma ENDP
 
@@ -278,7 +286,7 @@ loop2_done:
 return_buffer_c:
   mov rax,qword ptr [rcx + r9*8]
   ret
-
+  
 return_1:
   mov rax,1
   ret
@@ -319,17 +327,27 @@ done:
 fill_factorial_table ENDP
 
 
-; rcx - table_memory
-; rdx - primes_list (TODO: edx?)
-; r8d - first       (TODO: r8d?)
-; r9d - opl         (TODO: r9d?)
-; [rsp + 0x28] - node
-prime_sieve__asm PROC
+; rcx          - table_memory (B8*)
+; rdx          - primes_list  (U32*)
+; r8d          - first        (U32)
+; r9d          - opl          (U32)
+; [rsp + 0x28] - node         (ListNode_U32*)
+prime_sieve__asm PROC FRAME
   push r15
+.pushreg r15
   push r14
+.pushreg r14
   push r13
+.pushreg r13
   push r12
+.pushreg r12
   sub rsp,16
+.allocstack 16
+.endprolog
+  
+  ; extend first and opl to 64-bits
+  mov r8d,r8d
+  mov r9d,r9d
   
   ; save primes list at [rsp]
   mov [rsp],rdx
@@ -369,19 +387,19 @@ mixing0:
   test r15,r15
   jz done_mixing
   
-  ; r14 = node->array.v
+  ; ptr = node->array.v
   mov r14, [r15 + 8]
-  ; r10 = node->array.v + node->array.count
+  ; ptr_opl = node->array.v + node->array.count
   mov r10, [r15 + 16]
   lea r10, [r14 + r10*4]
   
 mixing1:
-  ; if (r14 >= r10) goto mixing0_next;
+  ; if (ptr >= ptr_opl) goto mixing0_next;
   cmp r14,r10
-  jge mixing0_next
+  jae mixing0_next
   
-  ; p = *r14
-  mov r11d, [r14]
+  ; p = *ptr
+  mov r11d, dword ptr [r14]
   
   ; if (p == 2) goto mixing1_next;
   cmp r11,2
@@ -391,7 +409,7 @@ mixing1:
   mov rax,r11
   imul rax,rax
   cmp rax,r12
-  jge done_mixing
+  jae done_mixing
   
   ; k = floor((M' + p - 1)/p)
   mov rax,r8
@@ -420,7 +438,7 @@ mixing1:
 mixing2:
   ; if (ptr >= table_memory_bound) goto mixing1_next;
   cmp rax,r13
-  jge mixing1_next;
+  jae mixing1_next;
   
   ; mark x in the table
   mov byte ptr [rax],1
@@ -481,7 +499,7 @@ scanning0:
 scanning1:
   ; if (ptr' >= table_memory_bound) goto scanning0_next;
   cmp r10,r13
-  jge scanning0_next;
+  jae scanning0_next;
   
   ; *(ptr') = 1
   mov byte ptr [r10], 1
@@ -496,7 +514,7 @@ scanning0_next:
   
   ; if (ptr < table_memory_bound) goto scanning0;
   cmp r12,r13
-  jl scanning0
+  jb scanning0
   
   add rsp,16
   pop r12
@@ -507,19 +525,21 @@ scanning0_next:
 prime_sieve__asm ENDP
 
 
-
-; rcx - table_memory
-; rdx - count (TODO: edx?)
+; rcx - table_memory (U32*)
+; rdx - count        (U32)
 ;  assumptions:
-;   rcx is a pointer to 4*rdx bytes, cleared to zero
+;   rcx is a pointer to 4*edx bytes, cleared to zero
 factorization_table__asm PROC
+  ; zero extend count to 64-bit
+  mov edx,edx
+  
   ; i = 0
   xor rax,rax
   
 loop0:
   ; if (i >= count) goto done;
   cmp rax,rdx
-  jge done
+  jae done
   
   ; f = table_memory[i]
   mov r9d, dword ptr [rcx + rax*4]
@@ -545,7 +565,7 @@ loop0:
 loop1:
   ; if (j >= count) goto loop0_next;
   cmp r9,rdx
-  jge loop0_next
+  jae loop0_next
   
   ; table_memory[j] = n
   mov dword ptr [rcx + r9*4], r8d
@@ -564,9 +584,9 @@ done:
 factorization_table__asm ENDP
 
 
-; rcx - fact_tbl
-; rdx - count (TODO: edx?)
-; r8d - n     (TODO: r8d?)
+; rcx - fact_tbl (U32*)
+; edx - count    (U32)
+; r8d - n        (U32)
 get_prime_factor PROC
   ; if (n even) goto return_2;
   test r8d,1
@@ -582,7 +602,7 @@ get_prime_factor PROC
   
   ; if (j >= count) goto return_0;
   cmp r8d,edx
-  jge return_0
+  jae return_0
   
   ; f = fact_tbl[j]
   mov eax, dword ptr [rcx + r8*4]
@@ -602,59 +622,64 @@ return_0:
 get_prime_factor ENDP
 
 
-; ecx - n (TODO: edx)
-; edx - f (TODO: r8d)
+; ecx - n
+; edx - f
 max_divide PROC
   
   ; move f into r8
   mov r8d,edx
-  ; move n into r10
-  mov r10d,ecx
   ; r = 0
-  xor r9,r9
+  xor r9d,r9d
   
 loop0:
   ; compute n/f and n%f
-  mov rax,r10
-  xor rdx,rdx
-  idiv r8
+  xor edx,edx
+  mov eax,ecx
+  idiv r8d
   
   ; if ((remainder) != 0) goto done;
-  test rdx,rdx
+  test edx,edx
   jnz done
   
   ; r += 1
-  inc r9
+  inc r9d
   
   ; n = (quotient)
-  mov r10d,eax
+  mov ecx,eax
   
   jmp loop0
   
 done:
-  mov rax,r10
+  mov eax,ecx
   shl rax,32
   or  rax,r9
   ret
 max_divide ENDP
 
 
-; rcx - fact_tbl
-; edx - count
-; r8d - n
-divisor_count PROC
+; rcx - fact_tbl (U32*)
+; edx - count    (U32)
+; r8d - n        (U32)
+divisor_count PROC FRAME
   push rsi
+.pushreg rsi
   push rdi
+.pushreg rdi
   push r12
+.pushreg r12
   push r13
+.pushreg r13
+  sub rsp,32
+.allocstack 32
+.endprolog
   
   ; move fact_tbl to rsi
   mov rsi, rcx
   
-  ; move count to rdi
+  ; move count to edi
   mov edi, edx
   
-  ; move n to r12
+  ; move n to r12d
   mov r12d, r8d
   
   ; accum = 1
@@ -693,8 +718,9 @@ loop0:
   
 done:
   
-  mov rax,r13
-
+  mov eax,r13d
+  
+  add rsp,32
   pop r13
   pop r12
   pop rdi
@@ -704,10 +730,10 @@ divisor_count ENDP
 
 
 
-; rcx - return pointer
-; rdx - min
-; r8  - max
-; r9  - target_product
+; rcx - return pointer (Pair_U64*)
+; rdx - min            (U64)
+; r8  - max            (U64)
+; r9  - target_product (U64)
 ;  assumptions:
 ;   rdx < r8
 ;   rdx*rdx <= target_product <= max*max
@@ -716,79 +742,75 @@ find_bounded_factors PROC
   mov qword ptr [rcx], 0
   mov qword ptr [rcx+8], 0
   
-  ; use r11 as the min
+  ; move min to r11
   mov r11, rdx
   
-  ; r10 = r11*r8
+  ; product = min*max
   mov r10, r11
   imul r10, r8
   
-  ; if (r10 == r9) goto return_min_max;
-  ; if (r10 < r9)  goto too_small;
+  ; if (product == target_product) goto return_min_max;
+  ; if (product < target_product)  goto too_small;
   ; goto too_big
   cmp r10, r9
   jz return_min_max
-  jl too_small
+  jb too_small
   jmp too_big
   
 too_small:
-  ; increase r11 so that:
-  ;  r11*r8 >= r9 & (r11 - 1)*r8 < r9
-  ;  r11 >= r9/r8 & r11 < r9/r8 + 1
-  ;  r9/r8 <= r11 < r9/r8 + 1
-  ;  r11 <- ceil(r9/r8)
+  ; increase min so that:
+  ;  min*max >= target_product & (min - 1)*max < target_product
+  ;  min >= target_product/max & min < target_product/max + 1
+  ;  target_product/max <= min < target_product/max + 1
+  ;  min <- ceil(target_product/max)
   
-  ; rax = r9, rdx = 0
-  mov rax, r9
+  ; q,r = target_product div max
   xor rdx,rdx
-  
-  ; rax = floor((0:r9)/r8), rdx = (0:r9)%r8
+  mov rax, r9
   idiv r8
   
-  ; if ((0:r9)%r8 == 0) goto too_small0;
+  ; if (r == 0) goto too_small0;
   ; goto too_small1;
   test rdx,rdx
   jz too_small0
   
 too_small1:
-  ; r11 = floor((0:r9)/r8)
+  ; min = floor((0:target_product)/max)
   mov r11, rax
   inc r11
   
-  ; if (r11 > r8) goto return;
+  ; if (min > max) goto return;
   cmp r11, r8
-  jg return
+  ja return
   jmp too_big
   
 too_small0:
-  ; r11 = floor((0:r9)/r8)
+  ; min = floor((0:target_product)/max)
   mov r11, rax
   
-  ; if (r11 > r8) goto return;
+  ; if (min > max) goto return;
   cmp r11, r8
-  jg return
+  ja return
   jmp return_min_max
   
 too_big:
-  ; decrease r8 so that:
-  ;  r11*r8 <= r9 & r11*(r8 + 1) > r9
-  ;  r8 <= r9/r11 & r8 > (r9/r11) - 1
-  ;  (r9/r11) - 1 < r8 <= r9/r11
-  ;  r8 <- floor(r9/r11)
+  ; decrease max so that:
+  ;  min*max <= target_product & min*(max + 1) > target_product
+  ;  max <= target_product/min & max > (target_product/min) - 1
+  ;  (target_product/min) - 1 < max <= target_product/min
+  ;  max <- floor(target_product/min)
   
-  ; rax = r9, rdx = 0
-  mov rax, r9
+  ; max = floor((0:target_product)/min)
   xor rdx,rdx
-  
-  ; r8 = floor((rdx:rax)/r11)
+  mov rax, r9
   idiv r11
   mov r8, rax
   
-  ; if (r11 > r8) goto return;
+  ; if (min > max) goto return;
   cmp r11, r8
-  jg return
+  ja return
   
-  ; if ((0:r9) == 0) goto return_min_max;
+  ; if ((0:target_product) == 0) goto return_min_max;
   ; goto too_small;
   test rdx, rdx
   jz return_min_max
@@ -804,15 +826,15 @@ return:
 find_bounded_factors ENDP
 
 
-; rcx - A
-; rdx - B
+; rcx - A (U64)
+; rdx - B (U64)
 gcd_euclidean PROC
   ; transfer B into r8
   mov r8, rdx
   
   ; if (A <= B) goto loop0;
   cmp rcx,r8
-  jle loop0
+  jbe loop0
   ; swap
   mov r8, rcx
   mov rcx, rdx
@@ -837,10 +859,14 @@ return:
 gcd_euclidean ENDP
 
 
-; rcx - A
-; rdx - B
-lcm_euclidean PROC
-  push rsi
+; rcx - A (U64)
+; rdx - B (U64)
+lcm_euclidean PROC FRAME
+  mov qword ptr [rsp + 8],rsi
+.savereg rsi,8
+  sub rsp,32
+.allocstack 32
+.endprolog
   
   ; rsi = A*B
   mov rsi,rcx
@@ -857,19 +883,18 @@ lcm_euclidean PROC
   xor rdx, rdx
   idiv rcx
   
-  pop rsi
+  add rsp,32
+  mov rsi,qword ptr [rsp + 8]
   ret
 lcm_euclidean ENDP
 
 
-; rcx - return pointer (pointer to EulerData)
-; rdx - text (pointer to String8)
-; r8  - out (ptr)
+; rcx - return pointer (EulerData*)
+; rdx - text           (String8*)
+; r8  - out            (U8*)
 euler_data_from_text__asm PROC
-  sub rsp,8
-  
   ; store og return pointer for later
-  mov [rsp],rcx
+  mov [rsp + 8],rcx
   
   ; result.v = out
   mov [rcx],r8
@@ -922,7 +947,7 @@ loop0_next:
   
 done0:
   
-  mov rax,[rsp]
+  mov rax,[rsp + 8]
   
   ; result.count = out_ptr - out;
   mov rdx,[rax]
@@ -932,19 +957,16 @@ done0:
   ; result.line_count = line_count;
   mov [rax + 16],r10
   
-  add rsp,8
   ret
 euler_data_from_text__asm ENDP
 
 
-; rcx - return pointer (pointer to EulerData)
-; rdx - text (pointer to String8)
-; r8  - out (ptr)
+; rcx - return pointer (EulerData*)
+; rdx - text           (String8*)
+; r8  - out            (U8*)
 euler_data_from_text_2dig__asm PROC
-  sub rsp,8
-  
   ; store og return pointer for later
-  mov [rsp],rcx
+  mov [rsp + 8],rcx
   
   ; result.v = out
   mov [rcx],r8
@@ -1020,7 +1042,7 @@ loop0_next:
   
 done0:
   
-  mov rax,[rsp]
+  mov rax,[rsp + 8]
   
   ; result.count = out_ptr - out;
   mov rdx,[rax]
@@ -1030,13 +1052,12 @@ done0:
   ; result.line_count = line_count;
   mov [rax + 16],r10
   
-  add rsp,8
   ret
 euler_data_from_text_2dig__asm ENDP
 
-; rcx - result pointer (U64x3 pointer)
-; rdx - a (U64x3 pointer)
-; r8  - b (U64x3 pointer)
+; rcx - result pointer (U64x3*)
+; rdx - a              (U64x3*)
+; r8  - b              (U64x3*)
 add_u64x3 PROC
   ; c0,r0 = a0 + b0
   xor r9,r9
@@ -1078,9 +1099,9 @@ add_u64x3 PROC
   ret
 add_u64x3 ENDP
 
-; rcx - result pointer (U64x3 pointer)
-; rdx - a (U64x3 pointer)
-; r8  - b (U64)
+; rcx - result pointer (U64x3*)
+; rdx - a              (U64x3*)
+; r8  - b              (U64)
 add_small_u64x3 PROC
   ; c0,r0 = a0 + b
   xor r9,r9
@@ -1112,9 +1133,9 @@ add_small_u64x3 PROC
   ret
 add_small_u64x3 ENDP
 
-; rcx - result pointer (U64x3 pointer)
-; rdx - a (U64x3 pointer)
-; r8  - b (U64)
+; rcx - result pointer (U64x3*)
+; rdx - a              (U64x3*)
+; r8  - b              (U64)
 mul_small_u64x3 PROC
   
   ; move a to r9
@@ -1160,9 +1181,9 @@ mul_small_u64x3 PROC
   ret
 mul_small_u64x3 ENDP
 
-; rcx - result pointer (U64x3_DivR pointer)
-; rdx - n (U64x3 pointer)
-; r8  - d (U64)
+; rcx - result pointer (U64x3_DivR*)
+; rdx - n              (U64x3*)
+; r8  - d              (U64)
 div_small_u64x3 PROC
   ; move n into r9
   mov r9,rdx
@@ -1200,14 +1221,21 @@ div_small_u64x3 PROC
 div_small_u64x3 ENDP
 
 
-; rcx - result pointer (U64x3 pointer)
-; rdx - digits (U8 pointer)
-; r8  - count (U64)
-u64x3_from_dec PROC
+; rcx - result pointer (U64x3*)
+; rdx - digits         (U8*)
+; r8  - count          (U64)
+u64x3_from_dec PROC FRAME
   push r12
+.pushreg r12
   push r13
+.pushreg r13
   push r14
+.pushreg r14
   push rbx
+.pushreg rbx
+  sub rsp,32
+.allocstack 32
+.endprolog
   
   ; clear result to zer0
   mov qword ptr [rcx],0
@@ -1278,6 +1306,7 @@ done:
   ; return result pointer
   mov rax, rbx
   
+  add rsp,32
   pop rbx
   pop r14
   pop r13
@@ -1286,13 +1315,18 @@ done:
 u64x3_from_dec ENDP
 
 
-; rcx - buffer (U8 pointer)
-; rdx - x (U64x3 pointer)
-dec_from_u64x3__asm PROC
+; rcx - buffer (U8*)
+; rdx - x      (U64x3*)
+dec_from_u64x3__asm PROC FRAME
   push r12
+.pushreg r12
   push r13
+.pushreg r13
   push r14
-  sub rsp,32
+.pushreg r14
+  sub rsp,64
+.allocstack 64
+.endprolog
   
   ; move buffer into r12
   mov r12,rcx
@@ -1300,36 +1334,31 @@ dec_from_u64x3__asm PROC
   ; ptr = buffer
   mov r13,r12
   
-  ; move x to rsp "by value"
+  ; move x to rsp + 32 "by value"
   mov rax,[rdx]
-  mov [rsp],rax
+  mov [rsp + 32],rax
   mov rax,[rdx + 8]
-  mov [rsp + 8],rax
+  mov [rsp + 40],rax
   mov rax,[rdx + 16]
-  mov [rsp + 16],rax
+  mov [rsp + 48],rax
   
 loop0:
   
   ; if (x[0] == 0 && x[1] == 0 && x[2] == 0) goto finish;
-  mov rax,[rsp]
-  test rax,rax
-  jnz done_check
-  mov rax,[rsp + 8]
-  test rax,rax
-  jnz done_check
-  mov rax,[rsp + 16]
+  mov rax,[rsp + 32]
+  or  rax,[rsp + 40]
+  or  rax,[rsp + 48]
   test rax,rax
   jz finish
-done_check:
   
   ; call div_small_u64x3(div-result, x, 10)
-  mov rcx,rsp
-  mov rdx,rsp
+  lea rcx,[rsp + 32]
+  lea rdx,[rsp + 32]
   mov r8,10
   call div_small_u64x3
   
   ; d = div_result.r
-  mov rcx,[rsp + 24]
+  mov rcx,[rsp + 56]
   
   ; *ptr = d
   mov byte ptr [r13], cl
@@ -1370,18 +1399,20 @@ reverse_loop:
   
 done:
   
-  add rsp,32
+  add rsp,64
   pop r14
   pop r13
   pop r12
   ret
 dec_from_u64x3__asm ENDP
 
-; rcx - a (U64xN pointer)
+; rcx - a (U64xN*)
 ; rdx - b (U64)
 ;  assumption: a has an extra slot of memory available
-mul_small_in_place_u64xn PROC
-  push r12
+mul_small_in_place_u64xn PROC FRAME
+  mov [rsp + 8],r12
+.savereg r12, 8
+.endprolog
   
   ; move b into r9
   mov r9,rdx
@@ -1435,11 +1466,11 @@ done:
   mov qword ptr [rcx],r12
   
 return:
-  pop r12
+  mov r12,[rsp + 8]
   ret
 mul_small_in_place_u64xn ENDP
 
-; rcx - n (U64xN pointer)
+; rcx - n (U64xN*)
 ; rdx - d (U64)
 div_small_in_place_u64xn PROC
   ; move d into r8
@@ -1489,11 +1520,17 @@ return:
 div_small_in_place_u64xn ENDP
 
 ; rcx - buffer (U8*)
-; rdx - x (U64xN*) (we're allowed to modify this in place)
-dec_from_u64xn__asm PROC
+; rdx - x      (U64xN*) (we're allowed to modify this in place)
+dec_from_u64xn__asm PROC FRAME
   push r12
+.pushreg r12
   push r13
+.pushreg r13
   push r14
+.pushreg r14
+  sub rsp,32
+.allocstack 32
+.endprolog
   
   ; move buffer into r12
   mov r12,rcx
@@ -1558,6 +1595,7 @@ reverse_loop:
   
 done:
   
+  add rsp,32
   pop r14
   pop r13
   pop r12
@@ -1568,7 +1606,11 @@ memmove PROTO
 
 ; rcx - array (U64*)
 ; rdx - index (U64)
-darray_delete PROC
+darray_delete PROC FRAME
+  sub rsp,32
+.allocstack 32
+.endprolog
+  
   ; count = array.count
   mov rax, qword ptr [rcx - 8]
   
@@ -1595,19 +1637,28 @@ darray_delete PROC
   call memmove
   
 skip:
+  add rsp,32
   ret
 darray_delete ENDP
 
 
-; rcx - fact_table (U64*)
+; rcx - fact_table  (U64*)
 ; rdx - label_array (U64*)
-; r8  - perm_out (U64*)
-euler24 PROC
+; r8  - perm_out    (U64*)
+euler24 PROC FRAME
   push r12
+.pushreg r12
   push r13
+.pushreg r13
   push r14
+.pushreg r14
   push r15
+.pushreg r15
   push rsi
+.pushreg rsi
+  sub rsp,32
+.allocstack 32
+.endprolog
   
   ; index = 999999
   mov r12,999999
@@ -1659,6 +1710,7 @@ loop0:
   mov rcx,qword ptr [r13]
   mov qword ptr [rsi],rcx
   
+  add rsp,32
   pop rsi
   pop r15
   pop r14

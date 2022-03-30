@@ -252,22 +252,12 @@ int
 main(void){
   M_Arena *arena = m_alloc_arena();
   
-  U64 fact_tbl[10] = {};
-  fill_factorial_table(fact_tbl, 10);
+  U64x3 x = {1000000000000, 0, 0};
+  x = mul_small_u64x3(x, 1000000000000);
+  Array_U8 dec_x = dec_from_u64x3(arena, x);
   
-  U64 label_array[11] = {10};
-  for (U64 i = 0; i < 10; i += 1){
-    label_array[i + 1] = i;
-  }
-  
-  U64 perm[10] = {
-    max_U64, max_U64, max_U64, max_U64, max_U64,
-    max_U64, max_U64, max_U64, max_U64, max_U64,
-  };
-  
-  euler24(fact_tbl, label_array + 1, perm);
-  for (U64 i = 0; i < 10; i += 1){
-    fprintf(stdout, "%llu", perm[i]);
+  for (U64 i = 0; i < dec_x.count; i += 1){
+    fprintf(stdout, "%u", dec_x.v[i]);
   }
   fprintf(stdout, "\n");
   

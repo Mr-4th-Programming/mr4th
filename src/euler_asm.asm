@@ -728,6 +728,91 @@ done:
   ret
 divisor_count ENDP
 
+; rcx - fact_tbl (U32*)
+; edx - count    (U32)
+; r8d - n        (U32)
+divisor_sum PROC FRAME
+  push rsi
+.pushreg rsi
+  sub rsp,32
+.allocstack 32
+.endprolog
+  
+  ; save params
+  mov qword ptr [rsp + 48],rcx
+  mov dword ptr [rsp + 56],edx
+  mov dword ptr [rsp + 64],r8d
+  
+  ; accum = 1
+  mov esi,1
+  
+loop0:
+  ; recover n from stack
+  mov r8d, dword ptr [rsp + 64]
+  
+  ; if (n <= 1) goto done0
+  cmp r8d,1
+  jbe done0
+  
+  ; call get_prime_factor(fact_tbl, count, n)
+  mov rcx, qword ptr [rsp + 48]
+  mov edx, dword ptr [rsp + 56]
+  ; r8d is already set to n
+  call get_prime_factor
+  
+  ; move p to rcx
+  mov rcx,rax
+  
+  ; zero rdx
+  xor rdx,rdx
+  
+  ; move n to rax
+  mov eax, dword ptr [rsp + 64]
+  
+  ; n,r = n div p
+  div rcx
+  
+  ; p_power = p
+  mov r8,rcx
+  
+  ; p_sum = 1 + p
+  lea r9,[1 + rcx]
+  
+loop1:
+  ; good_n = n
+  mov r10d,eax
+  
+  ; n,r = n div p
+  div rcx
+  
+  ; if (r != 0) goto done1
+  test rdx,rdx
+  jnz done1
+  
+  ; p_power *= p
+  imul r8,rcx
+  
+  ; p_sum += p_power
+  add r9,r8
+  
+  jmp loop1
+  
+done1:
+  ; move n back to stack memory
+  mov dword ptr [rsp + 64],r10d
+  
+  ; accum *= p_sum
+  imul rsi,r9
+  
+  jmp loop0
+  
+done0:
+  mov rax,rsi
+  
+  add rsp,32
+  pop rsi
+  ret
+divisor_sum ENDP
 
 
 ; rcx - return pointer (Pair_U64*)
@@ -887,6 +972,86 @@ lcm_euclidean PROC FRAME
   mov rsi,qword ptr [rsp + 8]
   ret
 lcm_euclidean ENDP
+
+; rcx - d (U64)
+dec_repeating_cycle_score PROC
+  ; if (d == 0) goto return_0;
+  test rcx,rcx
+  jz return_0
+  
+  ;; divide out all factors of 2
+loop2:
+  ; if (d & 1) goto loop2_done;
+  test rcx,1
+  jnz loop2_done
+  
+  ; d /= 2
+  shr rcx,1
+  jmp loop2
+  
+loop2_done:
+  
+  ;; divide out all factors of 5
+  xor rdx,rdx
+  mov rax,rcx
+loop5:
+  mov rcx,rax
+  
+  ; d /= 5
+  mov r8,5
+  div r8
+  
+  ; if (remainder != 0) goto loop5_done
+  test rdx,rdx
+  jnz loop5_done
+  jmp loop5
+  
+loop5_done:
+  
+  ; if (d == 1) goto return_0;
+  cmp rcx,1
+  je return_0
+  
+  ; s = 1
+  mov r8,1
+  ; n = 10
+  mov r9,10
+  
+loop9:
+  ; m = n - 1
+  mov rax,r9
+  dec rax
+  
+  ; m div d
+  xor rdx,rdx
+  div rcx
+  
+  ; if (remainder == 0) goto loop9_done
+  test rdx,rdx
+  jz loop9_done
+  
+  ; s += 1
+  inc r8
+  
+  ; if (s >= 18) assert
+  cmp r8,18
+  jb normal
+  int 3
+  
+normal:
+  ; n *= 10
+  imul r9,10
+  
+  jmp loop9
+  
+loop9_done:
+  mov rax,r8
+  ret
+  
+return_0:
+  xor rax,rax
+  ret
+dec_repeating_cycle_score ENDP
 
 
 ; rcx - return pointer (EulerData*)
@@ -1409,6 +1574,73 @@ dec_from_u64x3__asm ENDP
 ; rcx - a (U64xN*)
 ; rdx - b (U64)
 ;  assumption: a has an extra slot of memory available
+add_small_in_place_u64xn PROC
+  ; size = a.size
+  mov r11, [rcx]
+  
+  ; if (size == 0) goto simple_case;
+  test r11,r11
+  jz simple_case
+  
+  ; c,r0 = a[0] + b
+  xor r9,r9
+  mov rax, qword ptr [rcx + 8]
+  add rax, rdx
+  setc r9b
+  
+  ; a[0] = r0
+  mov qword ptr [rcx + 8], rax
+  
+  ; ptr = &a[1]
+  lea rdx, [rcx + 16]
+  ; opl = &a[size]
+  lea r8, [8 + rcx + r11*8]
+  
+  ; *opl = 0
+  mov qword ptr [r8],0
+  
+loop0:
+  ; if (c == 0) goto loop0_done
+  test r9b,r9b
+  jz loop0_done
+  
+  ; c',r = *ptr + c
+  xor r10,r10
+  mov rax, qword ptr [rdx]
+  add rax, r9
+  setc r10b
+  
+  ; *ptr = r
+  mov qword ptr [rdx], rax
+  
+  ; ptr += 1
+  add rdx,8
+  
+  ; c = c'
+  mov r9,r10
+  
+  jmp loop0
+  
+loop0_done:
+  ; if (*opl == 0) goto skip_inc_size;
+  mov rax, [r8]
+  test rax,rax
+  jz skip_inc_size
+  inc r11
+  mov [rcx],r11
+  
+skip_inc_size:
+  ret
+  
+simple_case:
+  mov qword ptr [rcx], 1
+  mov [rcx + 8], rdx
+  ret
+add_small_in_place_u64xn ENDP
+
+; rcx - a (U64xN*)
+; rdx - b (U64)
+;  assumption: a has an extra slot of memory available
 mul_small_in_place_u64xn PROC FRAME
   mov [rsp + 8],r12
 .savereg r12, 8
@@ -1601,123 +1833,6 @@ done:
   pop r12
   ret
 dec_from_u64xn__asm ENDP
-
-memmove PROTO
-
-; rcx - array (U64*)
-; rdx - index (U64)
-darray_delete PROC FRAME
-  sub rsp,32
-.allocstack 32
-.endprolog
-  
-  ; count = array.count
-  mov rax, qword ptr [rcx - 8]
-  
-  ; if (index >= count) goto skip
-  cmp rdx,rax
-  jae skip
-  
-  ; new_count = count - 1
-  dec rax
-  
-  ; array.count = new_count
-  mov qword ptr [rcx - 8], rax
-  
-  ; move array to r8, index to r9
-  mov r8,rcx
-  mov r9,rdx
-  
-  ; call memmove(rcx + index, rcx + index + 1, (count - index)*8)
-  lea rcx,[r8 + r9*8]
-  lea rdx,[r8 + r9*8 + 8]
-  mov r8,rax
-  sub r8,r9
-  shl r8,3
-  call memmove
-  
-skip:
-  add rsp,32
-  ret
-darray_delete ENDP
-
-
-; rcx - fact_table  (U64*)
-; rdx - label_array (U64*)
-; r8  - perm_out    (U64*)
-euler24 PROC FRAME
-  push r12
-.pushreg r12
-  push r13
-.pushreg r13
-  push r14
-.pushreg r14
-  push r15
-.pushreg r15
-  push rsi
-.pushreg rsi
-  sub rsp,32
-.allocstack 32
-.endprolog
-  
-  ; index = 999999
-  mov r12,999999
-  
-  ; move fact_table into r15
-  mov r15, rcx
-  
-  ; move label_array into r10
-  mov r13,rdx
-  
-  ; move perm_out into rsi
-  mov rsi,r8
-  
-  ; i = 8
-  mov r14,8
-  
-loop0:
-  ; perm_count = fact_table[i]
-  mov r8,qword ptr [r15 + r14*8]
-  
-  ; group_index,new_index = index/perm_count
-  mov rax,r12
-  xor rdx,rdx
-  div r8
-  
-  ; *perm_out = label_array[group_index]
-  mov rcx,qword ptr [r13 + rax*8]
-  mov qword ptr [rsi],rcx
-  
-  ; perm_out += 1
-  add rsi,8
-  
-  ; index = new_index
-  mov r12,rdx
-  
-  ; call darray_delete(label_array, group_index)
-  mov rcx,r13
-  mov rdx,rax
-  call darray_delete
-  
-  ; i -= 1
-  dec r14
-  
-  ; if (i <= 8) goto loop0
-  test r14,8
-  jbe loop0
-  
-  ; *perm_out = label_array[0]
-  mov rcx,qword ptr [r13]
-  mov qword ptr [rsi],rcx
-  
-  add rsp,32
-  pop rsi
-  pop r15
-  pop r14
-  pop r13
-  pop r12
-  ret
-euler24 ENDP
 
 END
 

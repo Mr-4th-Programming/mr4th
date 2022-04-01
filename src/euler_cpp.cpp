@@ -82,6 +82,7 @@ c_linkage void factorization_table__asm(U32 *table_memory, U32 count);
 c_linkage U32  get_prime_factor(U32 *fact_tbl, U32 count, U32 n);
 c_linkage Pair_U32 max_divide(U32 n, U32 f);
 c_linkage U32  divisor_count(U32 *fact_tbl, U32 count, U32 n);
+c_linkage U64  divisor_sum(U32 *fact_tbl, U32 count, U32 n);
 
 c_linkage Pair_U64 find_bounded_factors(U64 min, U64 max, U64 target_product);
 
@@ -99,14 +100,11 @@ c_linkage U64x3_DivR div_small_u64x3(U64x3 n, U64 d);
 c_linkage U64x3      u64x3_from_dec(U8 *digits, U64 count);
 c_linkage U64        dec_from_u64x3__asm(U8 *out, U64x3 x);
 
+c_linkage void add_small_in_place_u64xn(U64xN *a, U64 b);
 c_linkage void mul_small_in_place_u64xn(U64xN *a, U64 b);
 c_linkage U64  div_small_in_place_u64xn(U64xN *n, U64 d);
 
 c_linkage U64 dec_from_u64xn__asm(U8 *out, U64xN *x); // x is "destroyed" by this call
-
-c_linkage void darray_delete(U64 *array, U64 index);
-
-c_linkage U64 euler24(U64 *fact_table, U64 *label_array, U64 *perm_out);
 
 ////////////////////////////////
 // NOTE(allen): Helpers/Wrappers with C/C++ Niceness
@@ -248,18 +246,55 @@ dec_from_u64xn(M_Arena *arena, U64xN *x){
   return(result);
 }
 
+function U64
+dec_repeating_cycle_score(U64 d){
+  U64 result = 0;
+  
+  if (d > 0){
+    // divide out 2s
+    for (;(d & 1) == 0;){
+      d >>= 1;
+    }
+    
+    // divide out 5s
+    for (;(d % 5) == 0;){
+      d /= 5;
+    }
+    
+    // check 9s
+    if (d > 1){
+      U64 score = 1;
+      U64 buf1[60] = {1, 9};
+      U64 buf2[60] = {};
+      for (;;){
+        memcpy(buf2, buf1, sizeof(buf1));
+        U64 remainder = div_small_in_place_u64xn(buf1, d);
+        if (remainder == 0){
+          break;
+        }
+        score += 1;
+        memcpy(buf1, buf2, sizeof(buf1));
+        mul_small_in_place_u64xn(buf1, 10);
+        add_small_in_place_u64xn(buf1, 9);
+      }
+      
+      result = score;
+    }
+  }
+  
+  return(result);
+}
+
 int
 main(void){
   M_Arena *arena = m_alloc_arena();
   
-  U64x3 x = {1000000000000, 0, 0};
-  x = mul_small_u64x3(x, 1000000000000);
-  Array_U8 dec_x = dec_from_u64x3(arena, x);
-  
-  for (U64 i = 0; i < dec_x.count; i += 1){
-    fprintf(stdout, "%u", dec_x.v[i]);
+  U64 max_score = 0;
+  for (U64 d = 1; d < 1000; d += 1){
+    U64 score = dec_repeating_cycle_score(d);
+    max_score = Max(score, max_score);
+    printf("score(%llu) = %llu\n", d, score);
   }
-  fprintf(stdout, "\n");
   
   
   return(0);
